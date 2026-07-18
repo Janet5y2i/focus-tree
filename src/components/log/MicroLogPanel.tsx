@@ -23,6 +23,22 @@ const MOOD_OPTIONS: {
   { value: "anxious", emoji: "🌧️", label: "焦慮" },
 ];
 
+interface LogFilters {
+  mood: "" | MicroLogMood;
+  treeId: string;
+  nodeId: string;
+  from: string;
+  to: string;
+}
+
+const EMPTY_FILTERS: LogFilters = {
+  mood: "",
+  treeId: "",
+  nodeId: "",
+  from: "",
+  to: "",
+};
+
 export function MicroLogPanel({
   initialTrees,
   initialLogs,
@@ -38,22 +54,13 @@ export function MicroLogPanel({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState<LogFilters>(EMPTY_FILTERS);
+  const [filtering, setFiltering] = useState(false);
 
-  async function toggleTree(treeId: string) {
-    const selected = selectedTreeIds.includes(treeId);
-    if (selected) {
-      setSelectedTreeIds((current) => current.filter((id) => id !== treeId));
-      const nodeIds = new Set(
-        (nodesByTree[treeId] ?? []).map((node) => node.id),
-      );
-      setSelectedNodeIds((current) =>
-        current.filter((nodeId) => !nodeIds.has(nodeId)),
-      );
+  async function loadTreeNodes(treeId: string) {
+    if (!treeId || nodesByTree[treeId] || loadingTreeIds.includes(treeId)) {
       return;
     }
-
-    setSelectedTreeIds((current) => [...current, treeId]);
-    if (nodesByTree[treeId] || loadingTreeIds.includes(treeId)) return;
 
     setLoadingTreeIds((current) => [...current, treeId]);
     try {
@@ -71,12 +78,58 @@ export function MicroLogPanel({
     }
   }
 
+  async function toggleTree(treeId: string) {
+    const selected = selectedTreeIds.includes(treeId);
+    if (selected) {
+      setSelectedTreeIds((current) => current.filter((id) => id !== treeId));
+      const nodeIds = new Set(
+        (nodesByTree[treeId] ?? []).map((node) => node.id),
+      );
+      setSelectedNodeIds((current) =>
+        current.filter((nodeId) => !nodeIds.has(nodeId)),
+      );
+      return;
+    }
+
+    setSelectedTreeIds((current) => [...current, treeId]);
+    await loadTreeNodes(treeId);
+  }
+
   function toggleNode(nodeId: string) {
     setSelectedNodeIds((current) =>
       current.includes(nodeId)
         ? current.filter((id) => id !== nodeId)
         : [...current, nodeId],
     );
+  }
+
+  async function fetchFilteredLogs(nextFilters: LogFilters) {
+    setFiltering(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(nextFilters)) {
+        if (value) params.set(key, value);
+      }
+      const query = params.size > 0 ? `?${params.toString()}` : "";
+      const response = await fetch(`/api/micro-logs${query}`);
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error ?? "無法篩選記錄");
+        return;
+      }
+      setLogs(data.logs);
+    } catch {
+      setError("網路連線失敗，無法篩選記錄");
+    } finally {
+      setFiltering(false);
+    }
+  }
+
+  async function changeFilterTree(treeId: string) {
+    const next = { ...filters, treeId, nodeId: "" };
+    setFilters(next);
+    if (treeId) await loadTreeNodes(treeId);
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -105,7 +158,6 @@ export function MicroLogPanel({
         return;
       }
 
-      setLogs((current) => [data.log, ...current].slice(0, 50));
       setTrees((current) =>
         current.map(
           (tree) =>
@@ -118,6 +170,7 @@ export function MicroLogPanel({
       setSelectedTreeIds([]);
       setSelectedNodeIds([]);
       setSaved(true);
+      await fetchFilteredLogs(filters);
     } catch {
       setError("網路連線失敗，請稍後再試");
     } finally {
@@ -303,7 +356,20 @@ export function MicroLogPanel({
         )}
       </div>
 
-      <LogHistory logs={logs} trees={trees} />
+      <LogHistory
+        logs={logs}
+        trees={trees}
+        filters={filters}
+        filterNodes={filters.treeId ? nodesByTree[filters.treeId] ?? [] : []}
+        filtering={filtering}
+        onFiltersChange={setFilters}
+        onTreeChange={changeFilterTree}
+        onApply={() => fetchFilteredLogs(filters)}
+        onClear={() => {
+          setFilters(EMPTY_FILTERS);
+          fetchFilteredLogs(EMPTY_FILTERS);
+        }}
+      />
     </div>
   );
 }
@@ -409,9 +475,23 @@ function NodeCheckbox({
 function LogHistory({
   logs,
   trees,
+  filters,
+  filterNodes,
+  filtering,
+  onFiltersChange,
+  onTreeChange,
+  onApply,
+  onClear,
 }: {
   logs: MicroLogDTO[];
   trees: TreeDTO[];
+  filters: LogFilters;
+  filterNodes: NodeDTO[];
+  filtering: boolean;
+  onFiltersChange: (filters: LogFilters) => void;
+  onTreeChange: (treeId: string) => void;
+  onApply: () => void;
+  onClear: () => void;
 }) {
   const treeNames = new Map(trees.map((tree) => [tree.id, tree.title]));
 
@@ -421,6 +501,17 @@ function LogHistory({
       <p className="mt-1 text-xs text-forest-600">
         這裡只收藏你完成的事，不計算還沒做的事。
       </p>
+
+      <LogFiltersPanel
+        filters={filters}
+        trees={trees}
+        nodes={filterNodes}
+        filtering={filtering}
+        onFiltersChange={onFiltersChange}
+        onTreeChange={onTreeChange}
+        onApply={onApply}
+        onClear={onClear}
+      />
 
       {logs.length === 0 ? (
         <p className="mt-6 rounded-xl bg-forest-50/70 px-4 py-5 text-sm leading-relaxed text-forest-600">
@@ -463,6 +554,146 @@ function LogHistory({
         </ol>
       )}
     </aside>
+  );
+}
+
+function LogFiltersPanel({
+  filters,
+  trees,
+  nodes,
+  filtering,
+  onFiltersChange,
+  onTreeChange,
+  onApply,
+  onClear,
+}: {
+  filters: LogFilters;
+  trees: TreeDTO[];
+  nodes: NodeDTO[];
+  filtering: boolean;
+  onFiltersChange: (filters: LogFilters) => void;
+  onTreeChange: (treeId: string) => void;
+  onApply: () => void;
+  onClear: () => void;
+}) {
+  const hasFilters = Object.values(filters).some(Boolean);
+
+  return (
+    <form
+      className="mt-4 rounded-xl bg-forest-50/70 p-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onApply();
+      }}
+    >
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-medium text-forest-800">篩選記錄</h3>
+        {hasFilters && (
+          <button
+            type="button"
+            onClick={onClear}
+            disabled={filtering}
+            className="text-xs text-forest-600 underline-offset-4 hover:underline"
+          >
+            清除
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 grid gap-2">
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-forest-600">心情</span>
+          <select
+            value={filters.mood}
+            onChange={(event) =>
+              onFiltersChange({
+                ...filters,
+                mood: event.target.value as LogFilters["mood"],
+              })
+            }
+            className="input-field py-2 text-sm"
+          >
+            <option value="">全部心情</option>
+            {MOOD_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.emoji} {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-forest-600">主目標</span>
+          <select
+            value={filters.treeId}
+            onChange={(event) => onTreeChange(event.target.value)}
+            className="input-field py-2 text-sm"
+          >
+            <option value="">全部目標樹</option>
+            {trees.map((tree) => (
+              <option key={tree.id} value={tree.id}>
+                {tree.title}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1">
+          <span className="text-xs text-forest-600">子目標／任務</span>
+          <select
+            value={filters.nodeId}
+            disabled={!filters.treeId}
+            onChange={(event) =>
+              onFiltersChange({ ...filters, nodeId: event.target.value })
+            }
+            className="input-field py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <option value="">全部子目標與任務</option>
+            {nodes.map((node) => (
+              <option key={node.id} value={node.id}>
+                {node.level === 2 ? "🌿 " : "　↳ "}
+                {node.title}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="grid grid-cols-2 gap-2">
+          <label className="flex min-w-0 flex-col gap-1">
+            <span className="text-xs text-forest-600">開始日期</span>
+            <input
+              type="date"
+              value={filters.from}
+              max={filters.to || undefined}
+              onChange={(event) =>
+                onFiltersChange({ ...filters, from: event.target.value })
+              }
+              className="input-field min-w-0 py-2 text-xs"
+            />
+          </label>
+          <label className="flex min-w-0 flex-col gap-1">
+            <span className="text-xs text-forest-600">結束日期</span>
+            <input
+              type="date"
+              value={filters.to}
+              min={filters.from || undefined}
+              onChange={(event) =>
+                onFiltersChange({ ...filters, to: event.target.value })
+              }
+              className="input-field min-w-0 py-2 text-xs"
+            />
+          </label>
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        disabled={filtering}
+        className="mt-3 w-full rounded-lg bg-leaf-700 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-leaf-600 disabled:opacity-60"
+      >
+        {filtering ? "篩選中…" : "套用篩選"}
+      </button>
+    </form>
   );
 }
 

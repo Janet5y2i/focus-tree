@@ -1,4 +1,5 @@
-export type ReviewPeriod = "weekly" | "biweekly" | "monthly";
+export type ReviewPresetPeriod = "weekly" | "biweekly" | "monthly";
+export type ReviewPeriod = ReviewPresetPeriod | "custom";
 
 export interface ReviewStats {
   from: string;

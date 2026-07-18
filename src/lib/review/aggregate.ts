@@ -16,9 +16,21 @@ const MAX_HIGHLIGHTS = 4;
 export async function buildReviewStats(
   userId: string,
   period: ReviewPeriod,
+  customRange?: { from: string; to: string },
 ): Promise<ReviewStats> {
-  const to = new Date();
-  const from = new Date(to.getTime() - PERIOD_DAYS[period] * 24 * 60 * 60 * 1000);
+  let from: Date;
+  let to: Date;
+
+  if (period === "custom") {
+    if (!customRange) throw new Error("Custom review range is required");
+    from = new Date(`${customRange.from}T00:00:00.000Z`);
+    to = new Date(`${customRange.to}T23:59:59.999Z`);
+  } else {
+    to = new Date();
+    from = new Date(
+      to.getTime() - PERIOD_DAYS[period] * 24 * 60 * 60 * 1000,
+    );
+  }
 
   const [logs, ripenedFruits] = await Promise.all([
     MicroLog.find({

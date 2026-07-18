@@ -1,19 +1,55 @@
+import type { NextRequest } from "next/server";
 import { requireSession } from "@/lib/api/guard";
 import { jsonError, jsonSuccess } from "@/lib/api/response";
 import { toMicroLogDTO, toTreeDTO } from "@/lib/api/serializers";
-import { createMicroLogSchema } from "@/lib/validations/micro-log";
+import {
+  createMicroLogSchema,
+  microLogFilterSchema,
+} from "@/lib/validations/micro-log";
 import { GoalNode } from "@/models/GoalNode";
 import { GoalTree } from "@/models/GoalTree";
 import { MicroLog } from "@/models/MicroLog";
+import type { MicroLogMood } from "@/lib/types/micro-log";
 
-export async function GET() {
+interface MicroLogQuery {
+  userId: string;
+  mood?: MicroLogMood;
+  treeIds?: string;
+  "nodeLinks.nodeId"?: string;
+  createdAt?: { $gte?: Date; $lte?: Date };
+}
+
+export async function GET(request: NextRequest) {
   try {
     const session = await requireSession();
     if (!session) return jsonError("未登入", 401);
 
-    const logs = await MicroLog.find({ userId: session.sub })
-      .sort({ loggedAt: -1 })
-      .limit(50);
+    const parsed = microLogFilterSchema.safeParse(
+      Object.fromEntries(request.nextUrl.searchParams),
+    );
+    if (!parsed.success) {
+      return jsonError(
+        parsed.error.issues[0]?.message ?? "篩選條件無效",
+        400,
+      );
+    }
+
+    const filters = parsed.data;
+    const query: MicroLogQuery = { userId: session.sub };
+    if (filters.mood) query.mood = filters.mood;
+    if (filters.treeId) query.treeIds = filters.treeId;
+    if (filters.nodeId) query["nodeLinks.nodeId"] = filters.nodeId;
+    if (filters.from || filters.to) {
+      query.createdAt = {};
+      if (filters.from) {
+        query.createdAt.$gte = new Date(`${filters.from}T00:00:00.000Z`);
+      }
+      if (filters.to) {
+        query.createdAt.$lte = new Date(`${filters.to}T23:59:59.999Z`);
+      }
+    }
+
+    const logs = await MicroLog.find(query).sort({ createdAt: -1 }).limit(100);
 
     return jsonSuccess({ logs: logs.map(toMicroLogDTO) });
   } catch (error) {
