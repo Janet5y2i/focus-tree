@@ -52,12 +52,19 @@ export async function PATCH(request: Request, { params }: Context) {
       return jsonError(parsed.error.issues[0]?.message ?? "輸入資料無效", 400);
     }
 
-    const tree = await GoalTree.findOneAndUpdate(
-      { _id: treeId, userId: session.sub },
-      { $set: parsed.data },
-      { new: true },
-    );
+    const tree = await GoalTree.findOne({ _id: treeId, userId: session.sub });
     if (!tree) return jsonError("找不到這棵樹", 404);
+
+    if (parsed.data.title !== undefined) tree.title = parsed.data.title;
+    if (parsed.data.description !== undefined) {
+      tree.description = parsed.data.description;
+    }
+    if (parsed.data.status !== undefined) tree.status = parsed.data.status;
+    if (parsed.data.isCompleted !== undefined) {
+      tree.isCompleted = parsed.data.isCompleted;
+      tree.completedAt = parsed.data.isCompleted ? new Date() : undefined;
+    }
+    await tree.save();
 
     return jsonSuccess({ tree: toTreeDTO(tree) });
   } catch (error) {

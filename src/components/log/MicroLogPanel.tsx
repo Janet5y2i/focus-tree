@@ -7,6 +7,7 @@ import type { NodeDTO, TreeDTO } from "@/lib/types/tree";
 interface MicroLogPanelProps {
   initialTrees: TreeDTO[];
   initialLogs: MicroLogDTO[];
+  initialRecurringTasks: NodeDTO[];
 }
 
 const MOOD_OPTIONS: {
@@ -42,8 +43,10 @@ const EMPTY_FILTERS: LogFilters = {
 export function MicroLogPanel({
   initialTrees,
   initialLogs,
+  initialRecurringTasks,
 }: MicroLogPanelProps) {
   const [content, setContent] = useState("");
+  const [recurringTaskId, setRecurringTaskId] = useState("");
   const [mood, setMood] = useState<MicroLogMood>("neutral");
   const [selectedTreeIds, setSelectedTreeIds] = useState<string[]>([]);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
@@ -101,6 +104,20 @@ export function MicroLogPanel({
         ? current.filter((id) => id !== nodeId)
         : [...current, nodeId],
     );
+  }
+
+  async function selectRecurringTask(taskId: string) {
+    setRecurringTaskId(taskId);
+    if (!taskId) return;
+
+    const task = initialRecurringTasks.find((item) => item.id === taskId);
+    if (!task) return;
+
+    setContent(task.title);
+    setSaved(false);
+    setSelectedTreeIds([task.treeId]);
+    setSelectedNodeIds([task.id]);
+    await loadTreeNodes(task.treeId);
   }
 
   async function fetchFilteredLogs(nextFilters: LogFilters) {
@@ -166,6 +183,7 @@ export function MicroLogPanel({
         ),
       );
       setContent("");
+      setRecurringTaskId("");
       setMood("neutral");
       setSelectedTreeIds([]);
       setSelectedNodeIds([]);
@@ -191,6 +209,30 @@ export function MicroLogPanel({
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
+            {initialRecurringTasks.length > 0 && (
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-forest-800">
+                  🔁 快速選擇經常性任務
+                </span>
+                <select
+                  value={recurringTaskId}
+                  onChange={(event) => selectRecurringTask(event.target.value)}
+                  className="input-field"
+                >
+                  <option value="">選擇後自動帶入記錄內容</option>
+                  {initialRecurringTasks.map((task) => {
+                    const tree = trees.find((item) => item.id === task.treeId);
+                    return (
+                      <option key={task.id} value={task.id}>
+                        {task.title}
+                        {tree ? `｜${tree.title}` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+            )}
+
             <label className="flex flex-col gap-2">
               <span className="sr-only">剛剛完成的事</span>
               <textarea

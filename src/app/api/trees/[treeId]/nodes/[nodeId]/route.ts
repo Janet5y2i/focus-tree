@@ -2,10 +2,19 @@ import { requireSession } from "@/lib/api/guard";
 import { jsonError, jsonSuccess } from "@/lib/api/response";
 import { toNodeDTO, toTreeDTO } from "@/lib/api/serializers";
 import { objectIdSchema, updateNodeSchema } from "@/lib/validations/tree";
-import { GoalTree } from "@/models/GoalTree";
+import { GoalTree, type IGoalTree } from "@/models/GoalTree";
 import { GoalNode } from "@/models/GoalNode";
 
 type Context = { params: Promise<{ treeId: string; nodeId: string }> };
+
+async function refreshFruitCount(tree: IGoalTree, userId: string) {
+  tree.stats.fruitCount = await GoalNode.countDocuments({
+    treeId: tree._id,
+    userId,
+    type: "task",
+    isCompleted: true,
+  });
+}
 
 async function loadOwned(
   userId: string,
@@ -49,22 +58,21 @@ export async function PATCH(request: Request, { params }: Context) {
     }
 
     if (parsed.data.isCompleted !== undefined) {
+      if (node.type !== "task") {
+        return jsonError("只有任務可以結出果實", 422);
+      }
+
       node.isCompleted = parsed.data.isCompleted;
       node.completedAt = parsed.data.isCompleted ? new Date() : undefined;
-
-      // 果實只在任務第一次完成時結出，之後不會被收回（無焦慮鐵律）
-      if (
-        parsed.data.isCompleted &&
-        node.type === "task" &&
-        !node.fruitEarned
-      ) {
-        node.fruitEarned = true;
-        tree.stats.fruitCount += 1;
-        await tree.save();
-      }
+      // 果實數代表目前實際勾選完成的任務數。
+      node.fruitEarned = parsed.data.isCompleted;
     }
 
     await node.save();
+    if (parsed.data.isCompleted !== undefined) {
+      await refreshFruitCount(tree, session.sub);
+      await tree.save();
+    }
 
     return jsonSuccess({ node: toNodeDTO(node), tree: toTreeDTO(tree) });
   } catch (error) {
@@ -104,6 +112,7 @@ export async function DELETE(_request: Request, { params }: Context) {
     }
 
     await node.deleteOne();
+    await refreshFruitCount(tree, session.sub);
     await tree.save();
 
     return jsonSuccess({ deleted: true, tree: toTreeDTO(tree) });

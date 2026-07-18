@@ -11,6 +11,7 @@ export interface IGoalNode extends Document {
   isCompleted: boolean;
   completedAt?: Date;
   fruitEarned: boolean;
+  isRecurring: boolean;
   layout?: { x: number; y: number; angle: number };
   createdAt: Date;
   updatedAt: Date;
@@ -28,6 +29,7 @@ const GoalNodeSchema = new Schema<IGoalNode>(
     isCompleted: { type: Boolean, default: false },
     completedAt: Date,
     fruitEarned: { type: Boolean, default: false },
+    isRecurring: { type: Boolean, default: false },
     layout: {
       x: Number,
       y: Number,

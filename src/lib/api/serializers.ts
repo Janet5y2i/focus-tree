@@ -10,6 +10,8 @@ export function toTreeDTO(tree: IGoalTree): TreeDTO {
     title: tree.title,
     description: tree.description,
     status: tree.status,
+    isCompleted: tree.isCompleted,
+    completedAt: tree.completedAt?.toISOString(),
     stats: {
       leafCount: tree.stats.leafCount,
       fruitCount: tree.stats.fruitCount,
@@ -32,6 +34,7 @@ export function toNodeDTO(node: IGoalNode): NodeDTO {
     isCompleted: node.isCompleted,
     completedAt: node.completedAt?.toISOString(),
     fruitEarned: node.fruitEarned,
+    isRecurring: node.isRecurring,
   };
 }
 

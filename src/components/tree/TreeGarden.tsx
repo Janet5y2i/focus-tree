@@ -12,6 +12,7 @@ export function TreeGarden({ initialTrees }: TreeGardenProps) {
   const [trees, setTrees] = useState<TreeDTO[]>(initialTrees);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(initialTrees.length === 0);
+  const [celebratedTree, setCelebratedTree] = useState<TreeDTO | null>(null);
 
   function handleCreated(tree: TreeDTO) {
     setTrees((prev) => [tree, ...prev]);
@@ -63,9 +64,17 @@ export function TreeGarden({ initialTrees }: TreeGardenProps) {
             }
             onTreeUpdated={handleTreeUpdated}
             onTreeDeleted={handleTreeDeleted}
+            onCelebrate={setCelebratedTree}
           />
         ))}
       </div>
+
+      {celebratedTree && (
+        <AchievementModal
+          tree={celebratedTree}
+          onClose={() => setCelebratedTree(null)}
+        />
+      )}
     </div>
   );
 }
@@ -163,26 +172,48 @@ function TreeCard({
   onToggle,
   onTreeUpdated,
   onTreeDeleted,
+  onCelebrate,
 }: {
   tree: TreeDTO;
   expanded: boolean;
   onToggle: () => void;
   onTreeUpdated: (tree: TreeDTO) => void;
   onTreeDeleted: (treeId: string) => void;
+  onCelebrate: (tree: TreeDTO) => void;
 }) {
+  const [updating, setUpdating] = useState(false);
+
+  async function toggleAchievement() {
+    setUpdating(true);
+    try {
+      const response = await fetch(`/api/trees/${tree.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isCompleted: !tree.isCompleted }),
+      });
+      const data = await response.json();
+      if (!response.ok) return;
+
+      onTreeUpdated(data.tree);
+      if (data.tree.isCompleted) onCelebrate(data.tree);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
   return (
     <article className="card-surface overflow-hidden">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full items-center justify-between gap-4 p-5 text-left transition-colors hover:bg-forest-50/50 sm:p-6"
-      >
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3 p-5 transition-colors hover:bg-forest-50/50 sm:p-6">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
+        >
           <span className="text-2xl" aria-hidden>
-            🌳
+            {tree.isCompleted ? "🌟" : "🌳"}
           </span>
-          <div>
-            <h2 className="text-lg font-medium text-forest-900">
+          <div className="min-w-0">
+            <h2 className="truncate text-lg font-medium text-forest-900">
               {tree.title}
             </h2>
             {tree.description && (
@@ -191,18 +222,36 @@ function TreeCard({
               </p>
             )}
           </div>
-        </div>
+        </button>
 
         <div className="flex shrink-0 items-center gap-3 text-sm text-forest-600">
           {tree.stats.leafCount > 0 && (
             <span title="累積的微小實踐">🍃 {tree.stats.leafCount}</span>
           )}
           {tree.stats.fruitCount > 0 && (
-            <span title="結出的果實">🍎 {tree.stats.fruitCount}</span>
+            <span title="目前完成的任務">🍎 {tree.stats.fruitCount}</span>
           )}
-          <span className="text-forest-600/60">{expanded ? "收起" : "展開"}</span>
+          <button
+            type="button"
+            onClick={toggleAchievement}
+            disabled={updating}
+            className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
+              tree.isCompleted
+                ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                : "border border-forest-100 bg-white text-forest-700 hover:bg-forest-50"
+            }`}
+          >
+            {updating ? "…" : tree.isCompleted ? "✓ 已達成" : "標示達成"}
+          </button>
+          <button
+            type="button"
+            onClick={onToggle}
+            className="text-forest-600/60"
+          >
+            {expanded ? "收起" : "展開"}
+          </button>
         </div>
-      </button>
+      </div>
 
       {expanded && (
         <TreeDetail
@@ -212,5 +261,47 @@ function TreeCard({
         />
       )}
     </article>
+  );
+}
+
+function AchievementModal({
+  tree,
+  onClose,
+}: {
+  tree: TreeDTO;
+  onClose: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-forest-900/35 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="achievement-title"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-xl"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="text-6xl" aria-hidden>
+          🎉
+        </div>
+        <h2
+          id="achievement-title"
+          className="mt-5 text-2xl font-semibold text-forest-900"
+        >
+          恭喜你達成了這個目標！
+        </h2>
+        <p className="mt-3 text-lg font-medium text-leaf-700">
+          「{tree.title}」
+        </p>
+        <p className="mt-4 leading-relaxed text-forest-600">
+          每一片葉子、每一顆果實，都是你真實走過的路。請好好收藏這份屬於你的成長。
+        </p>
+        <button type="button" onClick={onClose} className="btn-primary mt-6">
+          收下這份喜悅
+        </button>
+      </div>
+    </div>
   );
 }
