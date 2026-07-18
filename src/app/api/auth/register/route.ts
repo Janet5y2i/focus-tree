@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import { connectDB } from "@/lib/db/mongoose";
 import { hashPassword } from "@/lib/auth/password";
 import { createSessionCookie } from "@/lib/auth/session";
