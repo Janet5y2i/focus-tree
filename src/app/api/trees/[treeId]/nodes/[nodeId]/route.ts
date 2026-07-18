@@ -68,6 +68,14 @@ export async function PATCH(request: Request, { params }: Context) {
       node.fruitEarned = parsed.data.isCompleted;
     }
 
+    if (parsed.data.isRecurring !== undefined) {
+      if (node.type !== "task") {
+        return jsonError("只有任務可以設為經常性任務", 422);
+      }
+
+      node.isRecurring = parsed.data.isRecurring;
+    }
+
     await node.save();
     if (parsed.data.isCompleted !== undefined) {
       await refreshFruitCount(tree, session.sub);
