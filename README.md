@@ -1,36 +1,67 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Focus Tree
+
+專注於「你已經完成了什麼」的心靈成長 App。目標樹、Micro-Log、無焦慮回顧。
+
+## Tech Stack
+
+- **Frontend:** Next.js 16, React 19, Tailwind CSS 4（響應式 Web）
+- **Backend:** Next.js API Routes, MongoDB + Mongoose
+- **Auth:** bcrypt 密碼雜湊、JWT（httpOnly Cookie）
 
 ## Getting Started
 
-First, run the development server:
+### 1. 環境變數
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+編輯 `.env.local`：
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| 變數 | 說明 |
+|------|------|
+| `MONGODB_URI` | MongoDB 連線字串 |
+| `JWT_SECRET` | 至少 32 字元的隨機密鑰（production 必換） |
+| `JWT_EXPIRES_IN` | Token 有效期，預設 `7d` |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 2. 啟動 MongoDB
 
-## Learn More
+本機需有 MongoDB 運行中，或使用 MongoDB Atlas 連線字串。
 
-To learn more about Next.js, take a look at the following resources:
+### 3. 開發伺服器
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm install
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+開啟 [http://localhost:3000](http://localhost:3000)，未登入會導向 `/login`。
 
-## Deploy on Vercel
+## Auth 安全設計
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- 密碼以 **bcrypt**（12 rounds）雜湊儲存，明文永不入庫
+- Session 以 **JWT** 簽發，存放於 **httpOnly + SameSite=Lax** Cookie
+- Production 環境 Cookie 自動加上 `Secure` flag
+- API 回應僅返回 `SafeUser`（不含 `passwordHash`）
+- Middleware 保護所有頁面與 API（`/login`、`/register` 除外）
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 專案結構
+
+```
+src/
+├── app/
+│   ├── (auth)/          # 登入、註冊
+│   ├── (protected)/     # 需登入的頁面
+│   └── api/auth/        # 認證 API
+├── components/
+├── lib/auth/            # bcrypt, JWT, session
+├── models/              # Mongoose schemas
+└── middleware.ts        # 路由保護
+```
+
+## Scripts
+
+- `npm run dev` — 開發模式
+- `npm run build` — 正式建置
+- `npm run start` — 正式伺服器
+- `npm run lint` — ESLint
