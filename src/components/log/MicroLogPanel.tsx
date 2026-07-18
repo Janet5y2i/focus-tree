@@ -401,9 +401,27 @@ export function MicroLogPanel({
       <LogHistory
         logs={logs}
         trees={trees}
+        nodesByTree={nodesByTree}
+        loadingTreeIds={loadingTreeIds}
         filters={filters}
         filterNodes={filters.treeId ? nodesByTree[filters.treeId] ?? [] : []}
         filtering={filtering}
+        onLoadTreeNodes={loadTreeNodes}
+        onLogUpdated={(updatedLog, updatedTrees) => {
+          setLogs((current) =>
+            current.map((log) =>
+              log.id === updatedLog.id ? updatedLog : log,
+            ),
+          );
+          if (updatedTrees.length > 0) {
+            setTrees((current) =>
+              current.map(
+                (tree) =>
+                  updatedTrees.find((item) => item.id === tree.id) ?? tree,
+              ),
+            );
+          }
+        }}
         onFiltersChange={setFilters}
         onTreeChange={changeFilterTree}
         onApply={() => fetchFilteredLogs(filters)}
@@ -517,9 +535,13 @@ function NodeCheckbox({
 function LogHistory({
   logs,
   trees,
+  nodesByTree,
+  loadingTreeIds,
   filters,
   filterNodes,
   filtering,
+  onLoadTreeNodes,
+  onLogUpdated,
   onFiltersChange,
   onTreeChange,
   onApply,
@@ -527,16 +549,18 @@ function LogHistory({
 }: {
   logs: MicroLogDTO[];
   trees: TreeDTO[];
+  nodesByTree: Record<string, NodeDTO[]>;
+  loadingTreeIds: string[];
   filters: LogFilters;
   filterNodes: NodeDTO[];
   filtering: boolean;
+  onLoadTreeNodes: (treeId: string) => Promise<void>;
+  onLogUpdated: (log: MicroLogDTO, trees: TreeDTO[]) => void;
   onFiltersChange: (filters: LogFilters) => void;
   onTreeChange: (treeId: string) => void;
   onApply: () => void;
   onClear: () => void;
 }) {
-  const treeNames = new Map(trees.map((tree) => [tree.id, tree.title]));
-
   return (
     <aside className="card-surface h-fit p-6 lg:sticky lg:top-24">
       <h2 className="text-lg font-medium text-forest-900">已經走過的腳步</h2>
@@ -562,40 +586,282 @@ function LogHistory({
       ) : (
         <ol className="mt-5 flex max-h-[36rem] flex-col gap-3 overflow-y-auto pr-1">
           {logs.map((log) => (
-            <li
+            <LogCard
               key={log.id}
-              className="rounded-xl border border-forest-100/80 bg-white p-4"
-            >
-              <p className="text-sm leading-relaxed text-forest-900">
-                {log.content}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <MoodBadge mood={log.mood} />
-                <time className="text-xs text-forest-600/70">
-                  {formatLoggedAt(log.loggedAt)}
-                </time>
-                {log.treeIds.map((treeId) => (
-                  <span
-                    key={treeId}
-                    className="rounded-full bg-forest-50 px-2 py-1 text-xs text-leaf-700"
-                  >
-                    🍃 {treeNames.get(treeId) ?? "一棵成長樹"}
-                  </span>
-                ))}
-                {log.nodeLinks.map((link) => (
-                  <span
-                    key={link.nodeId}
-                    className="rounded-full bg-surface-muted px-2 py-1 text-xs text-forest-700"
-                  >
-                    {link.nodeLevel === 2 ? "🌿" : "↳"} {link.nodeTitle}
-                  </span>
-                ))}
-              </div>
-            </li>
+              log={log}
+              trees={trees}
+              nodesByTree={nodesByTree}
+              loadingTreeIds={loadingTreeIds}
+              onLoadTreeNodes={onLoadTreeNodes}
+              onUpdated={onLogUpdated}
+            />
           ))}
         </ol>
       )}
     </aside>
+  );
+}
+
+function LogCard({
+  log,
+  trees,
+  nodesByTree,
+  loadingTreeIds,
+  onLoadTreeNodes,
+  onUpdated,
+}: {
+  log: MicroLogDTO;
+  trees: TreeDTO[];
+  nodesByTree: Record<string, NodeDTO[]>;
+  loadingTreeIds: string[];
+  onLoadTreeNodes: (treeId: string) => Promise<void>;
+  onUpdated: (log: MicroLogDTO, trees: TreeDTO[]) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [content, setContent] = useState(log.content);
+  const [mood, setMood] = useState<MicroLogMood>(log.mood);
+  const [selectedTreeIds, setSelectedTreeIds] = useState(log.treeIds);
+  const [selectedNodeIds, setSelectedNodeIds] = useState(
+    log.nodeLinks.map((link) => link.nodeId),
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const treeNames = new Map(trees.map((tree) => [tree.id, tree.title]));
+
+  async function startEditing() {
+    setContent(log.content);
+    setMood(log.mood);
+    setSelectedTreeIds(log.treeIds);
+    setSelectedNodeIds(log.nodeLinks.map((link) => link.nodeId));
+    setError(null);
+    setEditing(true);
+    await Promise.all(log.treeIds.map((treeId) => onLoadTreeNodes(treeId)));
+  }
+
+  function cancelEditing() {
+    setEditing(false);
+    setError(null);
+  }
+
+  async function toggleTree(treeId: string) {
+    const selected = selectedTreeIds.includes(treeId);
+    if (selected) {
+      setSelectedTreeIds((current) => current.filter((id) => id !== treeId));
+      const nodeIds = new Set(
+        (nodesByTree[treeId] ?? []).map((node) => node.id),
+      );
+      setSelectedNodeIds((current) =>
+        current.filter((nodeId) => !nodeIds.has(nodeId)),
+      );
+      return;
+    }
+
+    setSelectedTreeIds((current) => [...current, treeId]);
+    await onLoadTreeNodes(treeId);
+  }
+
+  function toggleNode(nodeId: string) {
+    setSelectedNodeIds((current) =>
+      current.includes(nodeId)
+        ? current.filter((id) => id !== nodeId)
+        : [...current, nodeId],
+    );
+  }
+
+  async function handleSave(event: FormEvent) {
+    event.preventDefault();
+    if (!content.trim()) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/micro-logs/${log.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          content,
+          mood,
+          treeIds: selectedTreeIds,
+          nodeIds: selectedNodeIds,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error ?? "更新失敗，請稍後再試");
+        return;
+      }
+
+      onUpdated(data.log, data.trees ?? []);
+      setEditing(false);
+    } catch {
+      setError("網路連線失敗，請稍後再試");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <li className="rounded-xl border border-leaf-600/40 bg-white p-4">
+        <form onSubmit={handleSave} className="flex flex-col gap-4">
+          <label className="flex flex-col gap-2">
+            <span className="text-xs font-medium text-forest-800">內容</span>
+            <textarea
+              value={content}
+              onChange={(event) => setContent(event.target.value)}
+              rows={3}
+              maxLength={300}
+              required
+              className="input-field resize-none text-sm leading-relaxed"
+            />
+            <span className="self-end text-xs text-forest-600/60">
+              {content.length}/300
+            </span>
+          </label>
+
+          <fieldset>
+            <legend className="text-xs font-medium text-forest-800">心情</legend>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {MOOD_OPTIONS.map((option) => {
+                const selected = mood === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    className={`cursor-pointer rounded-full border px-2.5 py-1.5 text-xs transition-colors ${
+                      selected
+                        ? "border-leaf-600 bg-forest-100 text-forest-900"
+                        : "border-forest-100 bg-white text-forest-700 hover:bg-forest-50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`mood-${log.id}`}
+                      value={option.value}
+                      checked={selected}
+                      onChange={() => setMood(option.value)}
+                      className="sr-only"
+                    />
+                    <span aria-hidden>{option.emoji} </span>
+                    {option.label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          {trees.length > 0 && (
+            <fieldset>
+              <legend className="text-xs font-medium text-forest-800">
+                相關的目標與任務
+              </legend>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {trees.map((tree) => {
+                  const selected = selectedTreeIds.includes(tree.id);
+                  return (
+                    <label
+                      key={tree.id}
+                      className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                        selected
+                          ? "border-leaf-600 bg-forest-100 text-forest-900"
+                          : "border-forest-100 bg-white text-forest-700 hover:bg-forest-50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected}
+                        onChange={() => toggleTree(tree.id)}
+                        className="sr-only"
+                      />
+                      <span aria-hidden>{selected ? "🍃 " : "🌳 "}</span>
+                      {tree.title}
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="mt-2 flex flex-col gap-2">
+                {selectedTreeIds.map((treeId) => {
+                  const tree = trees.find((item) => item.id === treeId);
+                  if (!tree) return null;
+                  return (
+                    <TreeNodePicker
+                      key={treeId}
+                      tree={tree}
+                      nodes={nodesByTree[treeId]}
+                      loading={loadingTreeIds.includes(treeId)}
+                      selectedNodeIds={selectedNodeIds}
+                      onToggleNode={toggleNode}
+                    />
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
+
+          {error && (
+            <p className="text-xs text-rose-700" role="alert">
+              {error}
+            </p>
+          )}
+
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={cancelEditing}
+              disabled={saving}
+              className="btn-ghost px-3 py-1.5 text-xs"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              disabled={saving || !content.trim()}
+              className="rounded-lg bg-leaf-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-leaf-600 disabled:opacity-60"
+            >
+              {saving ? "儲存中…" : "儲存"}
+            </button>
+          </div>
+        </form>
+      </li>
+    );
+  }
+
+  return (
+    <li className="rounded-xl border border-forest-100/80 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm leading-relaxed text-forest-900">{log.content}</p>
+        <button
+          type="button"
+          onClick={startEditing}
+          className="shrink-0 text-xs text-forest-600/70 underline-offset-4 transition-colors hover:text-leaf-700 hover:underline"
+        >
+          編輯
+        </button>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <MoodBadge mood={log.mood} />
+        <time className="text-xs text-forest-600/70">
+          {formatLoggedAt(log.loggedAt)}
+        </time>
+        {log.treeIds.map((treeId) => (
+          <span
+            key={treeId}
+            className="rounded-full bg-forest-50 px-2 py-1 text-xs text-leaf-700"
+          >
+            🍃 {treeNames.get(treeId) ?? "一棵成長樹"}
+          </span>
+        ))}
+        {log.nodeLinks.map((link) => (
+          <span
+            key={link.nodeId}
+            className="rounded-full bg-surface-muted px-2 py-1 text-xs text-forest-700"
+          >
+            {link.nodeLevel === 2 ? "🌿" : "↳"} {link.nodeTitle}
+          </span>
+        ))}
+      </div>
+    </li>
   );
 }
 

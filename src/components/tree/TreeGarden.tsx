@@ -2,31 +2,48 @@
 
 import { FormEvent, useState } from "react";
 import type { TreeDTO } from "@/lib/types/tree";
+import type { ForestTreeData } from "@/lib/types/forest";
 import { TreeDetail } from "./TreeDetail";
+import { ForestScene } from "./ForestScene";
 
 interface TreeGardenProps {
   initialTrees: TreeDTO[];
+  initialForest: ForestTreeData[];
 }
 
-export function TreeGarden({ initialTrees }: TreeGardenProps) {
+export function TreeGarden({ initialTrees, initialForest }: TreeGardenProps) {
   const [trees, setTrees] = useState<TreeDTO[]>(initialTrees);
+  const [forest, setForest] = useState<ForestTreeData[]>(initialForest);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(initialTrees.length === 0);
   const [celebratedTree, setCelebratedTree] = useState<TreeDTO | null>(null);
+
+  async function refreshForest() {
+    try {
+      const response = await fetch("/api/forest");
+      const data = await response.json();
+      if (response.ok) setForest(data.forest);
+    } catch {
+      // 森林全景是輔助視覺，刷新失敗時保留原畫面即可。
+    }
+  }
 
   function handleCreated(tree: TreeDTO) {
     setTrees((prev) => [tree, ...prev]);
     setShowForm(false);
     setExpandedId(tree.id);
+    refreshForest();
   }
 
   function handleTreeUpdated(updated: TreeDTO) {
     setTrees((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    refreshForest();
   }
 
   function handleTreeDeleted(treeId: string) {
     setTrees((prev) => prev.filter((t) => t.id !== treeId));
     setExpandedId((current) => (current === treeId ? null : current));
+    refreshForest();
   }
 
   return (
@@ -51,6 +68,15 @@ export function TreeGarden({ initialTrees }: TreeGardenProps) {
         </button>
       </section>
 
+      {forest.length > 0 && (
+        <section className="card-surface overflow-hidden p-4 sm:p-5">
+          <ForestScene forest={forest} />
+          <p className="mt-3 text-xs text-forest-600">
+            樹幹是主目標、樹枝是子目標；記下的每一步會在對應的樹枝長出葉子，勾選完成的任務則結成果實。
+          </p>
+        </section>
+      )}
+
       {showForm && <NewTreeForm onCreated={handleCreated} />}
 
       <div className="flex flex-col gap-4">
@@ -64,6 +90,7 @@ export function TreeGarden({ initialTrees }: TreeGardenProps) {
             }
             onTreeUpdated={handleTreeUpdated}
             onTreeDeleted={handleTreeDeleted}
+            onStructureChanged={refreshForest}
             onCelebrate={setCelebratedTree}
           />
         ))}
@@ -172,6 +199,7 @@ function TreeCard({
   onToggle,
   onTreeUpdated,
   onTreeDeleted,
+  onStructureChanged,
   onCelebrate,
 }: {
   tree: TreeDTO;
@@ -179,6 +207,7 @@ function TreeCard({
   onToggle: () => void;
   onTreeUpdated: (tree: TreeDTO) => void;
   onTreeDeleted: (treeId: string) => void;
+  onStructureChanged: () => void;
   onCelebrate: (tree: TreeDTO) => void;
 }) {
   const [updating, setUpdating] = useState(false);
@@ -258,6 +287,7 @@ function TreeCard({
           tree={tree}
           onTreeUpdated={onTreeUpdated}
           onTreeDeleted={onTreeDeleted}
+          onStructureChanged={onStructureChanged}
         />
       )}
     </article>

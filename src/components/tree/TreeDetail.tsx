@@ -7,12 +7,14 @@ interface TreeDetailProps {
   tree: TreeDTO;
   onTreeUpdated: (tree: TreeDTO) => void;
   onTreeDeleted: (treeId: string) => void;
+  onStructureChanged?: () => void;
 }
 
 export function TreeDetail({
   tree,
   onTreeUpdated,
   onTreeDeleted,
+  onStructureChanged,
 }: TreeDetailProps) {
   const [nodes, setNodes] = useState<NodeDTO[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +108,11 @@ export function TreeDetail({
           tasks={tasksByBranch.get(branch.id) ?? []}
           onChanged={(updatedTree) => {
             loadNodes();
-            if (updatedTree) onTreeUpdated(updatedTree);
+            if (updatedTree) {
+              onTreeUpdated(updatedTree);
+            } else {
+              onStructureChanged?.();
+            }
           }}
         />
       ))}
@@ -115,7 +121,10 @@ export function TreeDetail({
         treeId={tree.id}
         placeholder="新的子方向，例如：規律運動"
         buttonLabel="長出樹枝"
-        onAdded={() => loadNodes()}
+        onAdded={() => {
+          loadNodes();
+          onStructureChanged?.();
+        }}
       />
 
       <button
