@@ -39,7 +39,14 @@ export function toMicroLogDTO(log: IMicroLog): MicroLogDTO {
   return {
     id: log._id.toString(),
     content: log.content,
+    mood: log.mood,
     treeIds: log.treeIds.map((treeId) => treeId.toString()),
+    nodeLinks: log.nodeLinks.map((link) => ({
+      treeId: link.treeId.toString(),
+      nodeId: link.nodeId.toString(),
+      nodeLevel: link.nodeLevel,
+      nodeTitle: link.nodeTitle,
+    })),
     loggedAt: log.loggedAt.toISOString(),
   };
 }

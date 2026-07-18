@@ -6,6 +6,7 @@ const NodeLinkSchema = new Schema(
     nodeId: { type: Schema.Types.ObjectId, ref: "GoalNode", required: true },
     nodeLevel: { type: Number, enum: [2, 3] },
     anchorNodeId: { type: Schema.Types.ObjectId, ref: "GoalNode" },
+    nodeTitle: { type: String, required: true, maxlength: 100 },
   },
   { _id: false },
 );
@@ -13,13 +14,21 @@ const NodeLinkSchema = new Schema(
 export interface IMicroLog extends Document {
   userId: Types.ObjectId;
   content: string;
-  mood: "calm" | "grateful" | "focused" | "neutral";
+  mood:
+    | "calm"
+    | "grateful"
+    | "focused"
+    | "joyful"
+    | "tired"
+    | "anxious"
+    | "neutral";
   treeIds: Types.ObjectId[];
   nodeLinks: Array<{
     treeId: Types.ObjectId;
     nodeId: Types.ObjectId;
     nodeLevel?: 2 | 3;
     anchorNodeId?: Types.ObjectId;
+    nodeTitle: string;
   }>;
   leafEmittedForTreeIds: Types.ObjectId[];
   loggedAt: Date;
@@ -33,7 +42,15 @@ const MicroLogSchema = new Schema<IMicroLog>(
     content: { type: String, required: true, maxlength: 300 },
     mood: {
       type: String,
-      enum: ["calm", "grateful", "focused", "neutral"],
+      enum: [
+        "calm",
+        "grateful",
+        "focused",
+        "joyful",
+        "tired",
+        "anxious",
+        "neutral",
+      ],
       default: "neutral",
     },
     treeIds: [{ type: Schema.Types.ObjectId, ref: "GoalTree" }],

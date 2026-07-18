@@ -1,31 +1,81 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import type { MicroLogDTO } from "@/lib/types/micro-log";
-import type { TreeDTO } from "@/lib/types/tree";
+import type { MicroLogDTO, MicroLogMood } from "@/lib/types/micro-log";
+import type { NodeDTO, TreeDTO } from "@/lib/types/tree";
 
 interface MicroLogPanelProps {
   initialTrees: TreeDTO[];
   initialLogs: MicroLogDTO[];
 }
 
+const MOOD_OPTIONS: {
+  value: MicroLogMood;
+  emoji: string;
+  label: string;
+}[] = [
+  { value: "neutral", emoji: "🌿", label: "平常" },
+  { value: "calm", emoji: "😌", label: "平靜" },
+  { value: "grateful", emoji: "🙏", label: "感謝" },
+  { value: "focused", emoji: "🎯", label: "專注" },
+  { value: "joyful", emoji: "😊", label: "開心" },
+  { value: "tired", emoji: "😮‍💨", label: "疲憊" },
+  { value: "anxious", emoji: "🌧️", label: "焦慮" },
+];
+
 export function MicroLogPanel({
   initialTrees,
   initialLogs,
 }: MicroLogPanelProps) {
   const [content, setContent] = useState("");
+  const [mood, setMood] = useState<MicroLogMood>("neutral");
   const [selectedTreeIds, setSelectedTreeIds] = useState<string[]>([]);
+  const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
+  const [nodesByTree, setNodesByTree] = useState<Record<string, NodeDTO[]>>({});
+  const [loadingTreeIds, setLoadingTreeIds] = useState<string[]>([]);
   const [trees, setTrees] = useState(initialTrees);
   const [logs, setLogs] = useState(initialLogs);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  function toggleTree(treeId: string) {
-    setSelectedTreeIds((current) =>
-      current.includes(treeId)
-        ? current.filter((id) => id !== treeId)
-        : [...current, treeId],
+  async function toggleTree(treeId: string) {
+    const selected = selectedTreeIds.includes(treeId);
+    if (selected) {
+      setSelectedTreeIds((current) => current.filter((id) => id !== treeId));
+      const nodeIds = new Set(
+        (nodesByTree[treeId] ?? []).map((node) => node.id),
+      );
+      setSelectedNodeIds((current) =>
+        current.filter((nodeId) => !nodeIds.has(nodeId)),
+      );
+      return;
+    }
+
+    setSelectedTreeIds((current) => [...current, treeId]);
+    if (nodesByTree[treeId] || loadingTreeIds.includes(treeId)) return;
+
+    setLoadingTreeIds((current) => [...current, treeId]);
+    try {
+      const response = await fetch(`/api/trees/${treeId}`);
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error ?? "無法載入這棵樹的細節");
+        return;
+      }
+      setNodesByTree((current) => ({ ...current, [treeId]: data.nodes }));
+    } catch {
+      setError("網路連線失敗，無法載入目標細節");
+    } finally {
+      setLoadingTreeIds((current) => current.filter((id) => id !== treeId));
+    }
+  }
+
+  function toggleNode(nodeId: string) {
+    setSelectedNodeIds((current) =>
+      current.includes(nodeId)
+        ? current.filter((id) => id !== nodeId)
+        : [...current, nodeId],
     );
   }
 
@@ -41,7 +91,12 @@ export function MicroLogPanel({
       const response = await fetch("/api/micro-logs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content, treeIds: selectedTreeIds }),
+        body: JSON.stringify({
+          content,
+          mood,
+          treeIds: selectedTreeIds,
+          nodeIds: selectedNodeIds,
+        }),
       });
       const data = await response.json();
 
@@ -59,7 +114,9 @@ export function MicroLogPanel({
         ),
       );
       setContent("");
+      setMood("neutral");
       setSelectedTreeIds([]);
+      setSelectedNodeIds([]);
       setSaved(true);
     } catch {
       setError("網路連線失敗，請稍後再試");
@@ -101,6 +158,41 @@ export function MicroLogPanel({
               </span>
             </label>
 
+            <fieldset>
+              <legend className="text-sm font-medium text-forest-800">
+                此刻的心情是什麼？
+              </legend>
+              <p className="mt-1 text-xs text-forest-600">
+                沒有好壞，只是溫柔地看見現在的自己。
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {MOOD_OPTIONS.map((option) => {
+                  const selected = mood === option.value;
+                  return (
+                    <label
+                      key={option.value}
+                      className={`cursor-pointer rounded-full border px-3 py-2 text-sm transition-colors ${
+                        selected
+                          ? "border-leaf-600 bg-forest-100 text-forest-900"
+                          : "border-forest-100 bg-white text-forest-700 hover:bg-forest-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="mood"
+                        value={option.value}
+                        checked={selected}
+                        onChange={() => setMood(option.value)}
+                        className="sr-only"
+                      />
+                      <span aria-hidden>{option.emoji} </span>
+                      {option.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+
             {trees.length > 0 && (
               <fieldset>
                 <legend className="text-sm font-medium text-forest-800">
@@ -130,6 +222,24 @@ export function MicroLogPanel({
                         <span aria-hidden>{selected ? "🍃 " : "🌳 "}</span>
                         {tree.title}
                       </label>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 flex flex-col gap-3">
+                  {selectedTreeIds.map((treeId) => {
+                    const tree = trees.find((item) => item.id === treeId);
+                    if (!tree) return null;
+
+                    return (
+                      <TreeNodePicker
+                        key={treeId}
+                        tree={tree}
+                        nodes={nodesByTree[treeId]}
+                        loading={loadingTreeIds.includes(treeId)}
+                        selectedNodeIds={selectedNodeIds}
+                        onToggleNode={toggleNode}
+                      />
                     );
                   })}
                 </div>
@@ -198,6 +308,104 @@ export function MicroLogPanel({
   );
 }
 
+function TreeNodePicker({
+  tree,
+  nodes,
+  loading,
+  selectedNodeIds,
+  onToggleNode,
+}: {
+  tree: TreeDTO;
+  nodes?: NodeDTO[];
+  loading: boolean;
+  selectedNodeIds: string[];
+  onToggleNode: (nodeId: string) => void;
+}) {
+  if (loading) {
+    return (
+      <div className="rounded-xl bg-forest-50/70 px-4 py-3 text-sm text-forest-600">
+        正在展開「{tree.title}」的樹枝…
+      </div>
+    );
+  }
+
+  if (!nodes || nodes.length === 0) {
+    return (
+      <div className="rounded-xl bg-forest-50/70 px-4 py-3 text-sm text-forest-600">
+        「{tree.title}」目前沒有子目標，這筆記錄會連結到整棵樹。
+      </div>
+    );
+  }
+
+  const branches = nodes.filter((node) => node.level === 2);
+
+  return (
+    <div className="rounded-xl border border-forest-100 bg-forest-50/50 p-4">
+      <p className="text-sm font-medium text-forest-800">
+        🌳 {tree.title}
+      </p>
+      <p className="mt-1 text-xs text-forest-600">
+        可再勾選更明確的子目標或任務（選填）。
+      </p>
+
+      <div className="mt-3 flex flex-col gap-3">
+        {branches.map((branch) => {
+          const tasks = nodes.filter(
+            (node) => node.level === 3 && node.parentId === branch.id,
+          );
+
+          return (
+            <div key={branch.id} className="rounded-lg bg-white p-3">
+              <NodeCheckbox
+                node={branch}
+                selected={selectedNodeIds.includes(branch.id)}
+                onToggle={onToggleNode}
+              />
+
+              {tasks.length > 0 && (
+                <div className="mt-2 ml-6 flex flex-col gap-2 border-l border-forest-100 pl-3">
+                  {tasks.map((task) => (
+                    <NodeCheckbox
+                      key={task.id}
+                      node={task}
+                      selected={selectedNodeIds.includes(task.id)}
+                      onToggle={onToggleNode}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function NodeCheckbox({
+  node,
+  selected,
+  onToggle,
+}: {
+  node: NodeDTO;
+  selected: boolean;
+  onToggle: (nodeId: string) => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 text-sm text-forest-800">
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={() => onToggle(node.id)}
+        className="size-4 accent-leaf-700"
+      />
+      <span aria-hidden>{node.level === 2 ? "🌿" : "↳"}</span>
+      <span>{node.title}</span>
+      {node.fruitEarned && <span title="這個任務已結過果實">🍎</span>}
+    </label>
+  );
+}
+
 function LogHistory({
   logs,
   trees,
@@ -229,6 +437,7 @@ function LogHistory({
                 {log.content}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2">
+                <MoodBadge mood={log.mood} />
                 <time className="text-xs text-forest-600/70">
                   {formatLoggedAt(log.loggedAt)}
                 </time>
@@ -240,6 +449,14 @@ function LogHistory({
                     🍃 {treeNames.get(treeId) ?? "一棵成長樹"}
                   </span>
                 ))}
+                {log.nodeLinks.map((link) => (
+                  <span
+                    key={link.nodeId}
+                    className="rounded-full bg-surface-muted px-2 py-1 text-xs text-forest-700"
+                  >
+                    {link.nodeLevel === 2 ? "🌿" : "↳"} {link.nodeTitle}
+                  </span>
+                ))}
               </div>
             </li>
           ))}
@@ -249,12 +466,27 @@ function LogHistory({
   );
 }
 
+function MoodBadge({ mood }: { mood: MicroLogMood }) {
+  const option =
+    MOOD_OPTIONS.find((item) => item.value === mood) ?? MOOD_OPTIONS[0];
+
+  return (
+    <span
+      className="rounded-full bg-forest-50 px-2 py-1 text-xs text-forest-700"
+      title="記錄當下的心情"
+    >
+      {option.emoji} {option.label}
+    </span>
+  );
+}
+
 function formatLoggedAt(value: string) {
-  return new Intl.DateTimeFormat("zh-TW", {
-    timeZone: "Asia/Taipei",
-    month: "numeric",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
+  // 固定用 UTC+8 做純數字格式化，避免 Node 與瀏覽器的 Intl 輸出差異
+  // 造成 hydration mismatch。後續可再依使用者 timezone 由伺服器預先格式化。
+  const taipeiTime = new Date(new Date(value).getTime() + 8 * 60 * 60 * 1000);
+  const month = taipeiTime.getUTCMonth() + 1;
+  const day = taipeiTime.getUTCDate();
+  const hours = String(taipeiTime.getUTCHours()).padStart(2, "0");
+  const minutes = String(taipeiTime.getUTCMinutes()).padStart(2, "0");
+  return `${month}/${day} ${hours}:${minutes}`;
 }

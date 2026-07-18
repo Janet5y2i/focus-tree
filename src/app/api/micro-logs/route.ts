@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/api/guard";
 import { jsonError, jsonSuccess } from "@/lib/api/response";
 import { toMicroLogDTO, toTreeDTO } from "@/lib/api/serializers";
 import { createMicroLogSchema } from "@/lib/validations/micro-log";
+import { GoalNode } from "@/models/GoalNode";
 import { GoalTree } from "@/models/GoalTree";
 import { MicroLog } from "@/models/MicroLog";
 
@@ -48,11 +49,31 @@ export async function POST(request: Request) {
     }
 
     const ownedTreeIds = ownedTrees.map((tree) => tree._id);
+    const nodeIds = [...new Set(parsed.data.nodeIds)];
+    const ownedNodes = await GoalNode.find({
+      _id: { $in: nodeIds },
+      treeId: { $in: ownedTreeIds },
+      userId: session.sub,
+    });
+
+    // 節點必須同時屬於目前使用者，且位於這次勾選的目標樹中。
+    if (ownedNodes.length !== nodeIds.length) {
+      return jsonError("有些子目標或任務不存在，或不屬於所選目標樹", 400);
+    }
+
     const log = await MicroLog.create({
       userId: session.sub,
       content: parsed.data.content,
+      mood: parsed.data.mood,
       treeIds: ownedTreeIds,
-      nodeLinks: [],
+      nodeLinks: ownedNodes.map((node) => ({
+        treeId: node.treeId,
+        nodeId: node._id,
+        nodeLevel: node.level,
+        anchorNodeId: node.level === 3 ? node.parentId : undefined,
+        // 保留當下名稱快照；未來節點改名或刪除，歷史仍然完整。
+        nodeTitle: node.title,
+      })),
       leafEmittedForTreeIds: ownedTreeIds,
     });
 
