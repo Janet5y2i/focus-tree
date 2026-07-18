@@ -1,10 +1,35 @@
-export default function ReviewPage() {
-  return (
-    <div className="card-surface p-6 sm:p-8">
-      <h1 className="text-2xl font-semibold text-forest-900">成長回顧</h1>
-      <p className="mt-3 text-forest-600">
-        AI 回顧面板將在後續階段加入。此頁同樣受登入保護，僅展示已完成內容。
-      </p>
-    </div>
+import { getSession } from "@/lib/auth/session";
+import { connectDB } from "@/lib/db/mongoose";
+import { buildReviewStats } from "@/lib/review/aggregate";
+import { generateReviewSummary } from "@/lib/ai/review";
+import { reviewPeriodSchema } from "@/lib/validations/review";
+import { ReviewPanel } from "@/components/review/ReviewPanel";
+import { User } from "@/models/User";
+import type { ReviewResponse } from "@/lib/types/review";
+
+export default async function ReviewPage() {
+  const session = (await getSession())!;
+  await connectDB();
+
+  const user = await User.findById(session.sub);
+  const parsed = reviewPeriodSchema.safeParse(
+    user?.preferences.reviewCadence ?? "weekly",
   );
+  const period = parsed.success ? parsed.data : "weekly";
+
+  const stats = await buildReviewStats(session.sub, period);
+  const { summary, generatedBy } = await generateReviewSummary(
+    user?.displayName ?? "你",
+    period,
+    stats,
+  );
+
+  const initialReview: ReviewResponse = {
+    period,
+    stats,
+    summary,
+    generatedBy,
+  };
+
+  return <ReviewPanel initialReview={initialReview} />;
 }
