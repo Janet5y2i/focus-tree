@@ -14,6 +14,7 @@ export interface IMicroLog extends Document {
   userId: Types.ObjectId;
   content: string;
   mood: "calm" | "grateful" | "focused" | "neutral";
+  treeIds: Types.ObjectId[];
   nodeLinks: Array<{
     treeId: Types.ObjectId;
     nodeId: Types.ObjectId;
@@ -35,6 +36,7 @@ const MicroLogSchema = new Schema<IMicroLog>(
       enum: ["calm", "grateful", "focused", "neutral"],
       default: "neutral",
     },
+    treeIds: [{ type: Schema.Types.ObjectId, ref: "GoalTree" }],
     nodeLinks: [NodeLinkSchema],
     leafEmittedForTreeIds: [{ type: Schema.Types.ObjectId, ref: "GoalTree" }],
     loggedAt: { type: Date, default: Date.now, index: true },
