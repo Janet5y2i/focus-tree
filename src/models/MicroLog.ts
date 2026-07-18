@@ -62,6 +62,10 @@ const MicroLogSchema = new Schema<IMicroLog>(
 );
 
 MicroLogSchema.index({ userId: 1, loggedAt: -1 });
+MicroLogSchema.index({ userId: 1, createdAt: -1 });
+MicroLogSchema.index({ userId: 1, mood: 1, createdAt: -1 });
+MicroLogSchema.index({ userId: 1, treeIds: 1, createdAt: -1 });
+MicroLogSchema.index({ userId: 1, "nodeLinks.nodeId": 1, createdAt: -1 });
 
 export const MicroLog: Model<IMicroLog> =
   mongoose.models.MicroLog ??

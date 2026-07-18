@@ -28,4 +28,21 @@ export const createMicroLogSchema = z.object({
   mood: moodSchema.default("neutral"),
 });
 
+const dateInputSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "日期格式無效");
+
+export const microLogFilterSchema = z
+  .object({
+    mood: moodSchema.optional(),
+    treeId: objectIdSchema.optional(),
+    nodeId: objectIdSchema.optional(),
+    from: dateInputSchema.optional(),
+    to: dateInputSchema.optional(),
+  })
+  .refine(
+    ({ from, to }) => !from || !to || from <= to,
+    "開始日期不能晚於結束日期",
+  );
+
 export type CreateMicroLogInput = z.infer<typeof createMicroLogSchema>;

@@ -11,32 +11,67 @@ const PERIOD_OPTIONS: { value: ReviewPeriod; label: string }[] = [
   { value: "weekly", label: "這一週" },
   { value: "biweekly", label: "這兩週" },
   { value: "monthly", label: "這個月" },
+  { value: "custom", label: "自訂時間" },
 ];
 
 export function ReviewPanel({ initialReview }: ReviewPanelProps) {
   const [review, setReview] = useState(initialReview);
+  const [selectedPeriod, setSelectedPeriod] = useState<ReviewPeriod>(
+    initialReview.period,
+  );
+  const [customFrom, setCustomFrom] = useState(
+    initialReview.stats.from.slice(0, 10),
+  );
+  const [customTo, setCustomTo] = useState(
+    initialReview.stats.to.slice(0, 10),
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function selectPeriod(period: ReviewPeriod) {
-    if (period === review.period || loading) return;
+    if (loading) return;
+    setSelectedPeriod(period);
+    if (period === "custom" || period === review.period) return;
 
+    await loadReview(`/api/review?period=${period}`);
+  }
+
+  async function loadReview(url: string) {
     setLoading(true);
     setError(null);
 
     try {
-      const response = await fetch(`/api/review?period=${period}`);
+      const response = await fetch(url);
       const data = await response.json();
       if (!response.ok) {
         setError(data.error ?? "無法生成回顧，請稍後再試");
         return;
       }
       setReview(data);
+      setSelectedPeriod(data.period);
     } catch {
       setError("網路連線失敗，請稍後再試");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function applyCustomRange() {
+    if (!customFrom || !customTo) {
+      setError("請選擇開始與結束日期");
+      return;
+    }
+    if (customFrom > customTo) {
+      setError("開始日期不能晚於結束日期");
+      return;
+    }
+
+    const params = new URLSearchParams({
+      period: "custom",
+      from: customFrom,
+      to: customTo,
+    });
+    await loadReview(`/api/review?${params.toString()}`);
   }
 
   const { stats, summary } = review;
@@ -55,10 +90,10 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
           <div
             role="tablist"
             aria-label="回顧期間"
-            className="flex gap-1 self-start rounded-full bg-forest-50 p-1"
+            className="flex flex-wrap gap-1 self-start rounded-2xl bg-forest-50 p-1"
           >
             {PERIOD_OPTIONS.map((option) => {
-              const active = option.value === review.period;
+              const active = option.value === selectedPeriod;
               return (
                 <button
                   key={option.value}
@@ -79,6 +114,39 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
             })}
           </div>
         </div>
+
+        {selectedPeriod === "custom" && (
+          <div className="mt-5 flex flex-col gap-3 rounded-xl bg-forest-50/70 p-4 sm:flex-row sm:items-end">
+            <label className="flex flex-1 flex-col gap-1">
+              <span className="text-xs text-forest-600">開始日期</span>
+              <input
+                type="date"
+                value={customFrom}
+                max={customTo || undefined}
+                onChange={(event) => setCustomFrom(event.target.value)}
+                className="input-field py-2 text-sm"
+              />
+            </label>
+            <label className="flex flex-1 flex-col gap-1">
+              <span className="text-xs text-forest-600">結束日期</span>
+              <input
+                type="date"
+                value={customTo}
+                min={customFrom || undefined}
+                onChange={(event) => setCustomTo(event.target.value)}
+                className="input-field py-2 text-sm"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={applyCustomRange}
+              disabled={loading || !customFrom || !customTo}
+              className="rounded-xl bg-leaf-700 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-leaf-600 disabled:opacity-60"
+            >
+              {loading ? "回顧中…" : "看看這段成長"}
+            </button>
+          </div>
+        )}
 
         {error && (
           <p

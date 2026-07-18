@@ -3,7 +3,7 @@ import { requireSession } from "@/lib/api/guard";
 import { jsonError, jsonSuccess } from "@/lib/api/response";
 import { buildReviewStats } from "@/lib/review/aggregate";
 import { generateReviewSummary } from "@/lib/ai/review";
-import { reviewPeriodSchema } from "@/lib/validations/review";
+import { reviewQuerySchema } from "@/lib/validations/review";
 import { User } from "@/models/User";
 
 export async function GET(request: NextRequest) {
@@ -14,13 +14,26 @@ export async function GET(request: NextRequest) {
     const user = await User.findById(session.sub);
     if (!user) return jsonError("使用者不存在", 401);
 
-    const requested = request.nextUrl.searchParams.get("period");
-    const parsed = reviewPeriodSchema.safeParse(
-      requested ?? user.preferences.reviewCadence,
-    );
-    const period = parsed.success ? parsed.data : "weekly";
+    const parsed = reviewQuerySchema.safeParse({
+      period:
+        request.nextUrl.searchParams.get("period") ??
+        user.preferences.reviewCadence,
+      from: request.nextUrl.searchParams.get("from") ?? undefined,
+      to: request.nextUrl.searchParams.get("to") ?? undefined,
+    });
+    if (!parsed.success) {
+      return jsonError(
+        parsed.error.issues[0]?.message ?? "回顧時間範圍無效",
+        400,
+      );
+    }
+    const { period, from, to } = parsed.data;
 
-    const stats = await buildReviewStats(session.sub, period);
+    const stats = await buildReviewStats(
+      session.sub,
+      period,
+      period === "custom" && from && to ? { from, to } : undefined,
+    );
     const { summary, generatedBy } = await generateReviewSummary(
       user.displayName,
       period,
