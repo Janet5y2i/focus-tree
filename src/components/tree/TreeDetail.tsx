@@ -246,8 +246,16 @@ function TaskRow({
         >
           {task.title}
         </span>
-        {task.fruitEarned && (
-          <span aria-label="已結果實" title="這個任務曾經完成，果實不會消失">
+        {task.isRecurring && (
+          <span
+            className="rounded-full bg-sky-50 px-2 py-0.5 text-xs text-sky-700"
+            title="可在記錄頁快速選擇"
+          >
+            🔁 經常
+          </span>
+        )}
+        {task.isCompleted && (
+          <span aria-label="已結果實" title="這個任務目前已完成">
             🍎
           </span>
         )}
@@ -280,6 +288,7 @@ function AddNodeForm({
   onAdded: () => void;
 }) {
   const [title, setTitle] = useState("");
+  const [isRecurring, setIsRecurring] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -292,7 +301,7 @@ function AddNodeForm({
       const response = await fetch(`/api/trees/${treeId}/nodes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, parentId }),
+        body: JSON.stringify({ title, parentId, isRecurring }),
       });
       const data = await response.json();
 
@@ -302,6 +311,7 @@ function AddNodeForm({
       }
 
       setTitle("");
+      setIsRecurring(false);
       onAdded();
     } catch {
       setError("網路連線失敗，請稍後再試");
@@ -330,6 +340,22 @@ function AddNodeForm({
           {loading ? "…" : buttonLabel}
         </button>
       </div>
+      {parentId && (
+        <label className="flex cursor-pointer items-center justify-between rounded-lg bg-white px-3 py-2 text-sm text-forest-700">
+          <span>
+            <span className="font-medium">設為經常性任務</span>
+            <span className="ml-2 text-xs text-forest-600">
+              可在記錄頁快速帶入
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={isRecurring}
+            onChange={(event) => setIsRecurring(event.target.checked)}
+            className="size-4 accent-leaf-700"
+          />
+        </label>
+      )}
       {error && (
         <p className="text-xs text-rose-700" role="alert">
           {error}

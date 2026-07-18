@@ -5,6 +5,8 @@ export interface IGoalTree extends Document {
   title: string;
   description?: string;
   status: "active" | "paused" | "archived";
+  isCompleted: boolean;
+  completedAt?: Date;
   stats: {
     leafCount: number;
     fruitCount: number;
@@ -30,6 +32,8 @@ const GoalTreeSchema = new Schema<IGoalTree>(
       enum: ["active", "paused", "archived"],
       default: "active",
     },
+    isCompleted: { type: Boolean, default: false },
+    completedAt: Date,
     stats: {
       leafCount: { type: Number, default: 0, min: 0 },
       fruitCount: { type: Number, default: 0, min: 0 },

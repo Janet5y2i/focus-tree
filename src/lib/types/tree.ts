@@ -12,6 +12,8 @@ export interface TreeDTO {
   title: string;
   description?: string;
   status: TreeStatus;
+  isCompleted: boolean;
+  completedAt?: string;
   stats: TreeStats;
   createdAt: string;
 }
@@ -27,4 +29,5 @@ export interface NodeDTO {
   isCompleted: boolean;
   completedAt?: string;
   fruitEarned: boolean;
+  isRecurring: boolean;
 }

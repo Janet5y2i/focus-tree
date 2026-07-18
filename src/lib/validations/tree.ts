@@ -23,6 +23,7 @@ export const updateTreeSchema = z
       .optional(),
     description: z.string().trim().max(500, "描述最多 500 字").optional(),
     status: z.enum(["active", "paused", "archived"]).optional(),
+    isCompleted: z.boolean().optional(),
   })
   .refine(
     (data) => Object.values(data).some((value) => value !== undefined),
@@ -38,6 +39,7 @@ export const createNodeSchema = z.object({
   // 省略 parentId（或等於 treeId）＝ 長出子目標（Level 2）
   // 指向 Level 2 節點＝在其下長出任務（Level 3）
   parentId: objectIdSchema.optional(),
+  isRecurring: z.boolean().default(false),
 });
 
 export const updateNodeSchema = z

@@ -29,7 +29,7 @@ export async function POST(request: Request, { params }: Context) {
     const tree = await GoalTree.findOne({ _id: treeId, userId: session.sub });
     if (!tree) return jsonError("找不到這棵樹", 404);
 
-    const { title, parentId } = parsed.data;
+    const { title, parentId, isRecurring } = parsed.data;
     const isBranch = !parentId || parentId === treeId;
 
     if (isBranch) {
@@ -48,6 +48,7 @@ export async function POST(request: Request, { params }: Context) {
         level: 2,
         type: "branch",
         title,
+        isRecurring: false,
         order: tree.stats.branchCount,
       });
 
@@ -87,6 +88,7 @@ export async function POST(request: Request, { params }: Context) {
       level: 3,
       type: "task",
       title,
+      isRecurring,
       order: siblingCount,
     });
 
