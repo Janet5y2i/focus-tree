@@ -1,6 +1,8 @@
 import type { IGoalTree } from "@/models/GoalTree";
 import type { IGoalNode } from "@/models/GoalNode";
+import type { IMicroLog } from "@/models/MicroLog";
 import type { TreeDTO, NodeDTO } from "@/lib/types/tree";
+import type { MicroLogDTO } from "@/lib/types/micro-log";
 
 export function toTreeDTO(tree: IGoalTree): TreeDTO {
   return {
@@ -30,5 +32,14 @@ export function toNodeDTO(node: IGoalNode): NodeDTO {
     isCompleted: node.isCompleted,
     completedAt: node.completedAt?.toISOString(),
     fruitEarned: node.fruitEarned,
+  };
+}
+
+export function toMicroLogDTO(log: IMicroLog): MicroLogDTO {
+  return {
+    id: log._id.toString(),
+    content: log.content,
+    treeIds: log.treeIds.map((treeId) => treeId.toString()),
+    loggedAt: log.loggedAt.toISOString(),
   };
 }
