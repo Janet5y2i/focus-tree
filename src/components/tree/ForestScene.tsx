@@ -235,18 +235,6 @@ function TreeFigure({
         topY={trunkTopY}
       />
 
-      {tree.isCompleted && (
-        <text
-          x={0}
-          y={trunkTopY - 34}
-          textAnchor="middle"
-          fontSize={20}
-          aria-label="已達成的目標"
-        >
-          🌟
-        </text>
-      )}
-
       {/* 點擊樹之後才顯示主目標名稱 */}
       {selected && <TreeNameLabel title={tree.title} trunkTopY={trunkTopY} />}
     </g>
