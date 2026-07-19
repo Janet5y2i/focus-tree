@@ -117,6 +117,17 @@ export function AuthForm({ mode }: AuthFormProps) {
         />
       </label>
 
+      {!isRegister && (
+        <div className="-mt-2 text-right">
+          <Link
+            href="/forgot-password"
+            className="text-sm font-medium text-leaf-700 underline-offset-4 hover:underline"
+          >
+            {dictionary.auth.forgotPassword}
+          </Link>
+        </div>
+      )}
+
       {error && (
         <p
           className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"

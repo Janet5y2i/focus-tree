@@ -10,6 +10,17 @@ const API_ERROR_EN: Record<string, string> = {
   "使用者不存在": "User not found",
   "Email 或密碼錯誤": "Incorrect email or password",
   "此 Email 已被註冊": "This email is already registered",
+  "請輸入有效的 Email": "Please enter a valid email address",
+  "密碼至少 8 個字元": "Password must be at least 8 characters",
+  "密碼最多 128 個字元": "Password can be at most 128 characters",
+  "密碼需包含至少一個英文字母":
+    "Password must contain at least one letter",
+  "密碼需包含至少一個數字": "Password must contain at least one number",
+  "重設連結無效或已過期": "This reset link is invalid or has expired",
+  "無法處理重設密碼申請，請稍後再試":
+    "Couldn’t process the reset request. Please try again.",
+  "無法重設密碼，請稍後再試":
+    "Couldn’t reset the password. Please try again.",
   "無效的 ID": "Invalid ID",
   "無效的樹 ID": "Invalid tree ID",
   "無效的記錄 ID": "Invalid log ID",

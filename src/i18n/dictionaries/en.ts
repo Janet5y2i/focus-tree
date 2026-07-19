@@ -75,6 +75,25 @@ export const en: Dictionary = {
     noAccount: "New here?",
     logout: "Log out",
     loggingOut: "Logging out…",
+    forgotPassword: "Forgot password?",
+    forgotPasswordTitle: "Reset your password",
+    forgotPasswordTagline:
+      "Enter your account email and we’ll send you a reset link.",
+    sendResetLink: "Send reset link",
+    sendingResetLink: "Sending…",
+    resetRequestSuccess:
+      "If this account exists, a password reset email has been sent.",
+    backToLogin: "Back to login",
+    resetPasswordTitle: "Set a new password",
+    resetPasswordTagline: "Choose a new, secure password for your account.",
+    newPassword: "New password",
+    confirmPassword: "Confirm new password",
+    passwordMismatch: "The passwords don’t match",
+    invalidResetLink: "This reset link is invalid or missing its token",
+    resetPassword: "Update password",
+    resettingPassword: "Updating…",
+    resetPasswordSuccess:
+      "Your password has been updated. You can now log in with it.",
   },
   garden: {
     title: "My Growth Forest",

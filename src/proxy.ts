@@ -3,8 +3,18 @@ import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 import { AUTH_COOKIE_NAME, JWT_AUDIENCE, JWT_ISSUER } from "@/lib/auth/constants";
 
-const PUBLIC_PATHS = ["/login", "/register"];
-const AUTH_API_PATHS = ["/api/auth/login", "/api/auth/register"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+];
+const AUTH_API_PATHS = [
+  "/api/auth/login",
+  "/api/auth/register",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
+];
 
 function getSecretKey(): Uint8Array | null {
   const secret = process.env.JWT_SECRET;
