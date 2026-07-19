@@ -51,6 +51,7 @@ export const updateNodeSchema = z
       .max(100, "名稱最多 100 字")
       .optional(),
     isCompleted: z.boolean().optional(),
+    isRecurring: z.boolean().optional(),
   })
   .refine(
     (data) => Object.values(data).some((value) => value !== undefined),

@@ -28,6 +28,23 @@ export const createMicroLogSchema = z.object({
   mood: moodSchema.default("neutral"),
 });
 
+export const updateMicroLogSchema = z.object({
+  content: z
+    .string()
+    .trim()
+    .min(1, "寫下剛剛完成的一件小事吧")
+    .max(300, "記錄最多 300 字"),
+  mood: moodSchema,
+  treeIds: z
+    .array(objectIdSchema)
+    .max(12, "一次最多連結 12 棵目標樹")
+    .default([]),
+  nodeIds: z
+    .array(objectIdSchema)
+    .max(80, "一次連結的子目標與任務太多了")
+    .default([]),
+});
+
 const dateInputSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "日期格式無效");
@@ -46,3 +63,4 @@ export const microLogFilterSchema = z
   );
 
 export type CreateMicroLogInput = z.infer<typeof createMicroLogSchema>;
+export type UpdateMicroLogInput = z.infer<typeof updateMicroLogSchema>;

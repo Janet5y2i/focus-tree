@@ -2,6 +2,7 @@ import { getSession } from "@/lib/auth/session";
 import { connectDB } from "@/lib/db/mongoose";
 import { GoalTree } from "@/models/GoalTree";
 import { toTreeDTO } from "@/lib/api/serializers";
+import { buildForestData } from "@/lib/forest/build";
 import { TreeGarden } from "@/components/tree/TreeGarden";
 
 export default async function HomePage() {
@@ -9,9 +10,12 @@ export default async function HomePage() {
   const session = (await getSession())!;
 
   await connectDB();
-  const trees = await GoalTree.find({ userId: session.sub }).sort({
-    createdAt: -1,
-  });
+  const [trees, forest] = await Promise.all([
+    GoalTree.find({ userId: session.sub }).sort({ createdAt: -1 }),
+    buildForestData(session.sub),
+  ]);
 
-  return <TreeGarden initialTrees={trees.map(toTreeDTO)} />;
+  return (
+    <TreeGarden initialTrees={trees.map(toTreeDTO)} initialForest={forest} />
+  );
 }

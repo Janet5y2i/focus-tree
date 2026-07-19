@@ -7,12 +7,14 @@ interface TreeDetailProps {
   tree: TreeDTO;
   onTreeUpdated: (tree: TreeDTO) => void;
   onTreeDeleted: (treeId: string) => void;
+  onStructureChanged?: () => void;
 }
 
 export function TreeDetail({
   tree,
   onTreeUpdated,
   onTreeDeleted,
+  onStructureChanged,
 }: TreeDetailProps) {
   const [nodes, setNodes] = useState<NodeDTO[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +108,11 @@ export function TreeDetail({
           tasks={tasksByBranch.get(branch.id) ?? []}
           onChanged={(updatedTree) => {
             loadNodes();
-            if (updatedTree) onTreeUpdated(updatedTree);
+            if (updatedTree) {
+              onTreeUpdated(updatedTree);
+            } else {
+              onStructureChanged?.();
+            }
           }}
         />
       ))}
@@ -115,7 +121,10 @@ export function TreeDetail({
         treeId={tree.id}
         placeholder="新的子方向，例如：規律運動"
         buttonLabel="長出樹枝"
-        onAdded={() => loadNodes()}
+        onAdded={() => {
+          loadNodes();
+          onStructureChanged?.();
+        }}
       />
 
       <button
@@ -219,6 +228,21 @@ function TaskRow({
     }
   }
 
+  async function toggleRecurring() {
+    setPending(true);
+    try {
+      const response = await fetch(`/api/trees/${treeId}/nodes/${task.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isRecurring: !task.isRecurring }),
+      });
+      const data = await response.json();
+      if (response.ok) onChanged(data.tree);
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function handleDelete() {
     const response = await fetch(`/api/trees/${treeId}/nodes/${task.id}`, {
       method: "DELETE",
@@ -229,7 +253,7 @@ function TaskRow({
 
   return (
     <li className="flex items-center justify-between gap-3 rounded-lg bg-white px-3 py-2">
-      <label className="flex flex-1 cursor-pointer items-center gap-3">
+      <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
         <input
           type="checkbox"
           checked={task.isCompleted}
@@ -246,29 +270,64 @@ function TaskRow({
         >
           {task.title}
         </span>
-        {task.isRecurring && (
-          <span
-            className="rounded-full bg-sky-50 px-2 py-0.5 text-xs text-sky-700"
-            title="可在記錄頁快速選擇"
-          >
-            🔁 經常
-          </span>
-        )}
         {task.isCompleted && (
           <span aria-label="已結果實" title="這個任務目前已完成">
             🍎
           </span>
         )}
       </label>
-      <button
-        type="button"
-        onClick={handleDelete}
-        aria-label={`移除任務 ${task.title}`}
-        className="text-xs text-forest-600/50 transition-colors hover:text-rose-600"
-      >
-        移除
-      </button>
+      <div className="flex shrink-0 items-center gap-3">
+        <RecurringSwitch
+          checked={task.isRecurring}
+          disabled={pending}
+          onChange={toggleRecurring}
+        />
+        <button
+          type="button"
+          onClick={handleDelete}
+          aria-label={`移除任務 ${task.title}`}
+          className="text-xs text-forest-600/50 transition-colors hover:text-rose-600"
+        >
+          移除
+        </button>
+      </div>
     </li>
+  );
+}
+
+function RecurringSwitch({
+  checked,
+  disabled = false,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 text-xs text-forest-700">
+      <span>經常性</span>
+      <input
+        type="checkbox"
+        role="switch"
+        checked={checked}
+        disabled={disabled}
+        onChange={onChange}
+        className="sr-only"
+      />
+      <span
+        aria-hidden="true"
+        className={`relative h-5 w-9 rounded-full transition-colors ${
+          checked ? "bg-leaf-600" : "bg-forest-200"
+        } ${disabled ? "opacity-60" : ""}`}
+      >
+        <span
+          className={`absolute top-0.5 size-4 rounded-full bg-white shadow-sm transition-transform ${
+            checked ? "translate-x-4.5" : "translate-x-0.5"
+          }`}
+        />
+      </span>
+    </label>
   );
 }
 
@@ -322,16 +381,22 @@ function AddNodeForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           required
           maxLength={100}
-          className={`input-field ${compact ? "py-2 text-sm" : ""}`}
+          className={`input-field min-w-48 flex-1 ${compact ? "py-2 text-sm" : ""}`}
           placeholder={placeholder}
         />
+        {parentId && (
+          <RecurringSwitch
+            checked={isRecurring}
+            onChange={() => setIsRecurring((current) => !current)}
+          />
+        )}
         <button
           type="submit"
           disabled={loading}
@@ -340,22 +405,6 @@ function AddNodeForm({
           {loading ? "…" : buttonLabel}
         </button>
       </div>
-      {parentId && (
-        <label className="flex cursor-pointer items-center justify-between rounded-lg bg-white px-3 py-2 text-sm text-forest-700">
-          <span>
-            <span className="font-medium">設為經常性任務</span>
-            <span className="ml-2 text-xs text-forest-600">
-              可在記錄頁快速帶入
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            checked={isRecurring}
-            onChange={(event) => setIsRecurring(event.target.checked)}
-            className="size-4 accent-leaf-700"
-          />
-        </label>
-      )}
       {error && (
         <p className="text-xs text-rose-700" role="alert">
           {error}
