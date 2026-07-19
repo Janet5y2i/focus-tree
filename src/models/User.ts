@@ -4,6 +4,8 @@ export interface IUser extends Document {
   email: string;
   displayName: string;
   passwordHash: string;
+  passwordResetToken?: string;
+  passwordResetExpires?: Date;
   avatarUrl?: string;
   preferences: {
     reviewCadence: "weekly" | "biweekly" | "monthly";
@@ -33,6 +35,14 @@ const UserSchema = new Schema<IUser>(
     passwordHash: {
       type: String,
       required: true,
+      select: false,
+    },
+    passwordResetToken: {
+      type: String,
+      select: false,
+    },
+    passwordResetExpires: {
+      type: Date,
       select: false,
     },
     avatarUrl: String,
