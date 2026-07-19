@@ -233,13 +233,20 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
           <h2 className="text-lg font-medium text-forest-900">
             {dictionary.review.highlightsTitle}
           </h2>
-          <ul className="mt-4 flex flex-col gap-2">
-            {stats.highlights.map((highlight, index) => (
+          <ul className="mt-4 flex max-h-[28rem] flex-col gap-2 overflow-y-auto pr-1">
+            {stats.highlights.map((highlight) => (
               <li
-                key={index}
-                className="rounded-xl border border-forest-100/80 bg-white px-4 py-3 text-sm text-forest-800"
+                key={`${highlight.loggedAt}-${highlight.content.slice(0, 24)}`}
+                className="rounded-xl border border-forest-100/80 bg-white px-4 py-3"
               >
-                🍃 {highlight}
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm leading-relaxed text-forest-800">
+                    🍃 {highlight.content}
+                  </p>
+                  <time className="shrink-0 text-xs text-forest-600/70">
+                    {formatLoggedAt(highlight.loggedAt)}
+                  </time>
+                </div>
               </li>
             ))}
           </ul>
@@ -247,6 +254,16 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
       )}
     </div>
   );
+}
+
+function formatLoggedAt(value: string) {
+  // 固定用 UTC+8 做純數字格式化，避免 Node 與瀏覽器的 Intl 輸出差異。
+  const taipeiTime = new Date(new Date(value).getTime() + 8 * 60 * 60 * 1000);
+  const month = taipeiTime.getUTCMonth() + 1;
+  const day = taipeiTime.getUTCDate();
+  const hours = String(taipeiTime.getUTCHours()).padStart(2, "0");
+  const minutes = String(taipeiTime.getUTCMinutes()).padStart(2, "0");
+  return `${month}/${day} ${hours}:${minutes}`;
 }
 
 function StatCard({

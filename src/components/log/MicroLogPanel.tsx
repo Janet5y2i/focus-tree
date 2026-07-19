@@ -26,7 +26,21 @@ function getMoodOptions(dictionary: Dictionary): {
     { value: "joyful", emoji: "😊", label: dictionary.log.moodJoyful },
     { value: "tired", emoji: "😮‍💨", label: dictionary.log.moodTired },
     { value: "anxious", emoji: "🌧️", label: dictionary.log.moodAnxious },
+    { value: "sad", emoji: "😢", label: dictionary.log.moodSad },
   ];
+}
+
+function toggleMoodValue(
+  current: MicroLogMood[],
+  value: MicroLogMood,
+): MicroLogMood[] {
+  return current.includes(value)
+    ? current.filter((mood) => mood !== value)
+    : [...current, value];
+}
+
+function hasMoodSelection(moods: MicroLogMood[], customMood: string) {
+  return moods.length > 0 || Boolean(customMood.trim());
 }
 
 interface LogFilters {
@@ -54,7 +68,9 @@ export function MicroLogPanel({
   const moodOptions = getMoodOptions(dictionary);
   const [content, setContent] = useState("");
   const [recurringTaskId, setRecurringTaskId] = useState("");
-  const [mood, setMood] = useState<MicroLogMood>("neutral");
+  const [moods, setMoods] = useState<MicroLogMood[]>([]);
+  const [customMood, setCustomMood] = useState("");
+  const [customMoodOpen, setCustomMoodOpen] = useState(false);
   const [selectedTreeIds, setSelectedTreeIds] = useState<string[]>([]);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
   const [nodesByTree, setNodesByTree] = useState<Record<string, NodeDTO[]>>({});
@@ -167,6 +183,10 @@ export function MicroLogPanel({
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!content.trim()) return;
+    if (!hasMoodSelection(moods, customMood)) {
+      setError(dictionary.log.moodRequired);
+      return;
+    }
 
     setError(null);
     setSaved(false);
@@ -178,7 +198,8 @@ export function MicroLogPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
-          mood,
+          moods,
+          customMood: customMoodOpen ? customMood.trim() : "",
           treeIds: selectedTreeIds,
           nodeIds: selectedNodeIds,
         }),
@@ -201,7 +222,9 @@ export function MicroLogPanel({
       );
       setContent("");
       setRecurringTaskId("");
-      setMood("neutral");
+      setMoods([]);
+      setCustomMood("");
+      setCustomMoodOpen(false);
       setSelectedTreeIds([]);
       setSelectedNodeIds([]);
       setSaved(true);
@@ -279,32 +302,19 @@ export function MicroLogPanel({
               <p className="mt-1 text-xs text-forest-600">
                 {dictionary.log.moodHint}
               </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {moodOptions.map((option) => {
-                  const selected = mood === option.value;
-                  return (
-                    <label
-                      key={option.value}
-                      className={`cursor-pointer rounded-full border px-3 py-2 text-sm transition-colors ${
-                        selected
-                          ? "border-leaf-600 bg-forest-100 text-forest-900"
-                          : "border-forest-100 bg-white text-forest-700 hover:bg-forest-50"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="mood"
-                        value={option.value}
-                        checked={selected}
-                        onChange={() => setMood(option.value)}
-                        className="sr-only"
-                      />
-                      <span aria-hidden>{option.emoji} </span>
-                      {option.label}
-                    </label>
-                  );
-                })}
-              </div>
+              <MoodPicker
+                moods={moods}
+                customMood={customMood}
+                customMoodOpen={customMoodOpen}
+                options={moodOptions}
+                customLabel={dictionary.log.moodCustom}
+                customPlaceholder={dictionary.log.moodCustomPlaceholder}
+                onToggleMood={(value) =>
+                  setMoods((current) => toggleMoodValue(current, value))
+                }
+                onCustomMoodOpenChange={setCustomMoodOpen}
+                onCustomMoodChange={setCustomMood}
+              />
             </fieldset>
 
             {trees.length > 0 && (
@@ -380,7 +390,11 @@ export function MicroLogPanel({
 
             <button
               type="submit"
-              disabled={loading || !content.trim()}
+              disabled={
+                loading ||
+                !content.trim() ||
+                !hasMoodSelection(moods, customMood)
+              }
               className="btn-primary"
             >
               {loading
@@ -393,32 +407,6 @@ export function MicroLogPanel({
             </button>
           </form>
         </section>
-
-        {trees.length > 0 && (
-          <section className="card-surface p-6">
-            <h2 className="font-medium text-forest-900">
-              {dictionary.log.growingTrees}
-            </h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {trees.map((tree) => (
-                <div
-                  key={tree.id}
-                  className="flex items-center justify-between rounded-xl bg-forest-50/70 px-4 py-3"
-                >
-                  <span className="truncate text-sm text-forest-800">
-                    🌳 {tree.title}
-                  </span>
-                  <span
-                    className="ml-3 shrink-0 text-sm text-leaf-700"
-                    title={dictionary.log.leafTitle}
-                  >
-                    🍃 {tree.stats.leafCount}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
       </div>
 
       <LogHistory
@@ -651,7 +639,11 @@ function LogCard({
   const moodOptions = getMoodOptions(dictionary);
   const [editing, setEditing] = useState(false);
   const [content, setContent] = useState(log.content);
-  const [mood, setMood] = useState<MicroLogMood>(log.mood);
+  const [moods, setMoods] = useState<MicroLogMood[]>(log.moods);
+  const [customMood, setCustomMood] = useState(log.customMood ?? "");
+  const [customMoodOpen, setCustomMoodOpen] = useState(
+    Boolean(log.customMood),
+  );
   const [selectedTreeIds, setSelectedTreeIds] = useState(log.treeIds);
   const [selectedNodeIds, setSelectedNodeIds] = useState(
     log.nodeLinks.map((link) => link.nodeId),
@@ -663,7 +655,9 @@ function LogCard({
 
   async function startEditing() {
     setContent(log.content);
-    setMood(log.mood);
+    setMoods(log.moods);
+    setCustomMood(log.customMood ?? "");
+    setCustomMoodOpen(Boolean(log.customMood));
     setSelectedTreeIds(log.treeIds);
     setSelectedNodeIds(log.nodeLinks.map((link) => link.nodeId));
     setError(null);
@@ -704,6 +698,10 @@ function LogCard({
   async function handleSave(event: FormEvent) {
     event.preventDefault();
     if (!content.trim()) return;
+    if (!hasMoodSelection(moods, customMood)) {
+      setError(dictionary.log.moodRequired);
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -713,7 +711,8 @@ function LogCard({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           content,
-          mood,
+          moods,
+          customMood: customMoodOpen ? customMood.trim() : "",
           treeIds: selectedTreeIds,
           nodeIds: selectedNodeIds,
         }),
@@ -760,32 +759,20 @@ function LogCard({
             <legend className="text-xs font-medium text-forest-800">
               {dictionary.log.editMood}
             </legend>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {moodOptions.map((option) => {
-                const selected = mood === option.value;
-                return (
-                  <label
-                    key={option.value}
-                    className={`cursor-pointer rounded-full border px-2.5 py-1.5 text-xs transition-colors ${
-                      selected
-                        ? "border-leaf-600 bg-forest-100 text-forest-900"
-                        : "border-forest-100 bg-white text-forest-700 hover:bg-forest-50"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`mood-${log.id}`}
-                      value={option.value}
-                      checked={selected}
-                      onChange={() => setMood(option.value)}
-                      className="sr-only"
-                    />
-                    <span aria-hidden>{option.emoji} </span>
-                    {option.label}
-                  </label>
-                );
-              })}
-            </div>
+            <MoodPicker
+              moods={moods}
+              customMood={customMood}
+              customMoodOpen={customMoodOpen}
+              options={moodOptions}
+              customLabel={dictionary.log.moodCustom}
+              customPlaceholder={dictionary.log.moodCustomPlaceholder}
+              compact
+              onToggleMood={(value) =>
+                setMoods((current) => toggleMoodValue(current, value))
+              }
+              onCustomMoodOpenChange={setCustomMoodOpen}
+              onCustomMoodChange={setCustomMood}
+            />
           </fieldset>
 
           {trees.length > 0 && (
@@ -854,7 +841,11 @@ function LogCard({
             </button>
             <button
               type="submit"
-              disabled={saving || !content.trim()}
+              disabled={
+                saving ||
+                !content.trim() ||
+                !hasMoodSelection(moods, customMood)
+              }
               className="rounded-lg bg-leaf-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-leaf-600 disabled:opacity-60"
             >
               {saving ? dictionary.common.saving : dictionary.common.save}
@@ -878,10 +869,10 @@ function LogCard({
         </button>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <MoodBadge mood={log.mood} />
         <time className="text-xs text-forest-600/70">
           {formatLoggedAt(log.loggedAt)}
         </time>
+        <MoodBadges moods={log.moods} customMood={log.customMood} />
         {log.treeIds.map((treeId) => (
           <span
             key={treeId}
@@ -1057,19 +1048,126 @@ function LogFiltersPanel({
   );
 }
 
-function MoodBadge({ mood }: { mood: MicroLogMood }) {
-  const { dictionary } = useLocale();
-  const moodOptions = getMoodOptions(dictionary);
-  const option =
-    moodOptions.find((item) => item.value === mood) ?? moodOptions[0];
+function MoodPicker({
+  moods,
+  customMood,
+  customMoodOpen,
+  options,
+  customLabel,
+  customPlaceholder,
+  compact = false,
+  onToggleMood,
+  onCustomMoodOpenChange,
+  onCustomMoodChange,
+}: {
+  moods: MicroLogMood[];
+  customMood: string;
+  customMoodOpen: boolean;
+  options: { value: MicroLogMood; emoji: string; label: string }[];
+  customLabel: string;
+  customPlaceholder: string;
+  compact?: boolean;
+  onToggleMood: (value: MicroLogMood) => void;
+  onCustomMoodOpenChange: (open: boolean) => void;
+  onCustomMoodChange: (value: string) => void;
+}) {
+  const chipClass = compact
+    ? "cursor-pointer rounded-full border px-2.5 py-1.5 text-xs transition-colors"
+    : "cursor-pointer rounded-full border px-3 py-2 text-sm transition-colors";
 
   return (
-    <span
-      className="rounded-full bg-forest-50 px-2 py-1 text-xs text-forest-700"
-      title={dictionary.log.moodBadgeTitle}
-    >
-      {option.emoji} {option.label}
-    </span>
+    <div className={compact ? "mt-2 flex flex-col gap-2" : "mt-3 flex flex-col gap-2"}>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((option) => {
+          const selected = moods.includes(option.value);
+          return (
+            <label
+              key={option.value}
+              className={`${chipClass} ${
+                selected
+                  ? "border-leaf-600 bg-forest-100 text-forest-900"
+                  : "border-forest-100 bg-white text-forest-700 hover:bg-forest-50"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={() => onToggleMood(option.value)}
+                className="sr-only"
+              />
+              <span aria-hidden>{option.emoji} </span>
+              {option.label}
+            </label>
+          );
+        })}
+        <label
+          className={`${chipClass} ${
+            customMoodOpen
+              ? "border-leaf-600 bg-forest-100 text-forest-900"
+              : "border-forest-100 bg-white text-forest-700 hover:bg-forest-50"
+          }`}
+        >
+          <input
+            type="checkbox"
+            checked={customMoodOpen}
+            onChange={(event) => {
+              const open = event.target.checked;
+              onCustomMoodOpenChange(open);
+              if (!open) onCustomMoodChange("");
+            }}
+            className="sr-only"
+          />
+          {customLabel}
+        </label>
+      </div>
+      {customMoodOpen && (
+        <input
+          type="text"
+          value={customMood}
+          onChange={(event) => onCustomMoodChange(event.target.value)}
+          maxLength={40}
+          className={`input-field ${compact ? "py-2 text-sm" : ""}`}
+          placeholder={customPlaceholder}
+        />
+      )}
+    </div>
+  );
+}
+
+function MoodBadges({
+  moods,
+  customMood,
+}: {
+  moods: MicroLogMood[];
+  customMood?: string;
+}) {
+  const { dictionary } = useLocale();
+  const moodOptions = getMoodOptions(dictionary);
+
+  return (
+    <>
+      {moods.map((mood) => {
+        const option =
+          moodOptions.find((item) => item.value === mood) ?? moodOptions[0];
+        return (
+          <span
+            key={mood}
+            className="rounded-full bg-forest-50 px-2 py-1 text-xs text-forest-700"
+            title={dictionary.log.moodBadgeTitle}
+          >
+            {option.emoji} {option.label}
+          </span>
+        );
+      })}
+      {customMood && (
+        <span
+          className="rounded-full bg-forest-50 px-2 py-1 text-xs text-forest-700"
+          title={dictionary.log.moodBadgeTitle}
+        >
+          {customMood}
+        </span>
+      )}
+    </>
   );
 }
 

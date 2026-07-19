@@ -13,7 +13,7 @@ import type { MicroLogMood } from "@/lib/types/micro-log";
 
 interface MicroLogQuery {
   userId: string;
-  mood?: MicroLogMood;
+  $or?: Array<{ moods: MicroLogMood } | { mood: MicroLogMood }>;
   treeIds?: string;
   "nodeLinks.nodeId"?: string;
   createdAt?: { $gte?: Date; $lte?: Date };
@@ -36,7 +36,10 @@ export async function GET(request: NextRequest) {
 
     const filters = parsed.data;
     const query: MicroLogQuery = { userId: session.sub };
-    if (filters.mood) query.mood = filters.mood;
+    if (filters.mood) {
+      // 同時相容 moods 陣列與舊的單一 mood 欄位。
+      query.$or = [{ moods: filters.mood }, { mood: filters.mood }];
+    }
     if (filters.treeId) query.treeIds = filters.treeId;
     if (filters.nodeId) query["nodeLinks.nodeId"] = filters.nodeId;
     if (filters.from || filters.to) {
@@ -97,10 +100,14 @@ export async function POST(request: Request) {
       return jsonError("有些子目標或任務不存在，或不屬於所選目標樹", 400);
     }
 
+    const moods = [...new Set(parsed.data.moods)];
+    const customMood = parsed.data.customMood?.trim() || undefined;
+
     const log = await MicroLog.create({
       userId: session.sub,
       content: parsed.data.content,
-      mood: parsed.data.mood,
+      moods,
+      customMood,
       treeIds: ownedTreeIds,
       nodeLinks: ownedNodes.map((node) => ({
         treeId: node.treeId,

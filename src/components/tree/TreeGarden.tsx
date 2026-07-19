@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { type DragEvent, FormEvent, type ReactNode, useState } from "react";
 import { localizeApiError } from "@/i18n/api-errors";
 import { useLocale } from "@/i18n/locale-context";
 import type { TreeDTO } from "@/lib/types/tree";
@@ -14,12 +14,21 @@ interface TreeGardenProps {
 }
 
 export function TreeGarden({ initialTrees, initialForest }: TreeGardenProps) {
-  const { dictionary, t } = useLocale();
+  const { locale, dictionary, t } = useLocale();
   const [trees, setTrees] = useState<TreeDTO[]>(initialTrees);
   const [forest, setForest] = useState<ForestTreeData[]>(initialForest);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(initialTrees.length === 0);
   const [celebratedTree, setCelebratedTree] = useState<TreeDTO | null>(null);
+  const [draggedTreeId, setDraggedTreeId] = useState<string | null>(null);
+  const [reorderError, setReorderError] = useState<string | null>(null);
+
+  const activeTrees = trees
+    .filter((tree) => !tree.isCompleted)
+    .sort(compareActiveTrees);
+  const completedTrees = trees
+    .filter((tree) => tree.isCompleted)
+    .sort(compareCompletedTrees);
 
   async function refreshForest() {
     try {
@@ -47,6 +56,71 @@ export function TreeGarden({ initialTrees, initialForest }: TreeGardenProps) {
     setTrees((prev) => prev.filter((t) => t.id !== treeId));
     setExpandedId((current) => (current === treeId ? null : current));
     refreshForest();
+  }
+
+  async function reorderActiveTree(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
+
+    const sourceIndex = activeTrees.findIndex((tree) => tree.id === sourceId);
+    const targetIndex = activeTrees.findIndex((tree) => tree.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+
+    const reordered = [...activeTrees];
+    const [moved] = reordered.splice(sourceIndex, 1);
+    reordered.splice(targetIndex, 0, moved);
+
+    const previousOrders = new Map(
+      activeTrees.map((tree) => [tree.id, tree.manualOrder]),
+    );
+    const nextOrders = new Map(
+      reordered.map((tree, index) => [tree.id, index]),
+    );
+
+    setReorderError(null);
+    setTrees((current) =>
+      current.map((tree) =>
+        nextOrders.has(tree.id)
+          ? { ...tree, manualOrder: nextOrders.get(tree.id) }
+          : tree,
+      ),
+    );
+
+    try {
+      const response = await fetch("/api/trees/order", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ treeIds: reordered.map((tree) => tree.id) }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(
+          localizeApiError(
+            data.error,
+            locale,
+            dictionary.garden.reorderFailed,
+          ),
+        );
+      }
+    } catch (error) {
+      setTrees((current) =>
+        current.map((tree) =>
+          previousOrders.has(tree.id)
+            ? { ...tree, manualOrder: previousOrders.get(tree.id) }
+            : tree,
+        ),
+      );
+      setReorderError(
+        error instanceof Error
+          ? error.message
+          : dictionary.garden.reorderFailed,
+      );
+    }
+  }
+
+  function handleDrop(event: DragEvent<HTMLElement>, targetId: string) {
+    event.preventDefault();
+    if (draggedTreeId) reorderActiveTree(draggedTreeId, targetId);
+    setDraggedTreeId(null);
   }
 
   return (
@@ -79,22 +153,117 @@ export function TreeGarden({ initialTrees, initialForest }: TreeGardenProps) {
 
       {showForm && <NewTreeForm onCreated={handleCreated} />}
 
-      <div className="flex flex-col gap-4">
-        {trees.map((tree) => (
-          <TreeCard
-            key={tree.id}
-            tree={tree}
-            expanded={expandedId === tree.id}
-            onToggle={() =>
-              setExpandedId((current) => (current === tree.id ? null : tree.id))
-            }
-            onTreeUpdated={handleTreeUpdated}
-            onTreeDeleted={handleTreeDeleted}
-            onStructureChanged={refreshForest}
-            onCelebrate={setCelebratedTree}
-          />
-        ))}
-      </div>
+      <section aria-labelledby="active-trees-title">
+        <h2
+          id="active-trees-title"
+          className="mb-3 text-lg font-semibold text-forest-900"
+        >
+          {dictionary.garden.activeSection}
+        </h2>
+        {reorderError && (
+          <p
+            className="mb-3 rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
+            role="alert"
+          >
+            {reorderError}
+          </p>
+        )}
+        <div className="flex flex-col gap-4">
+          {activeTrees.map((tree, index) => (
+            <div
+              key={tree.id}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => handleDrop(event, tree.id)}
+              className={
+                draggedTreeId === tree.id
+                  ? "rounded-2xl opacity-55"
+                  : "rounded-2xl"
+              }
+            >
+              <TreeCard
+                tree={tree}
+                expanded={expandedId === tree.id}
+                dragHandle={
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    draggable
+                    aria-label={t(dictionary.garden.dragAria, {
+                      title: tree.title,
+                    })}
+                    title={t(dictionary.garden.dragAria, {
+                      title: tree.title,
+                    })}
+                    onDragStart={(event) => {
+                      setDraggedTreeId(tree.id);
+                      event.dataTransfer.effectAllowed = "move";
+                    }}
+                    onDragEnd={() => setDraggedTreeId(null)}
+                    onKeyDown={(event) => {
+                      if (event.key === "ArrowUp" && index > 0) {
+                        event.preventDefault();
+                        reorderActiveTree(tree.id, activeTrees[index - 1].id);
+                      }
+                      if (
+                        event.key === "ArrowDown" &&
+                        index < activeTrees.length - 1
+                      ) {
+                        event.preventDefault();
+                        reorderActiveTree(tree.id, activeTrees[index + 1].id);
+                      }
+                    }}
+                    className="cursor-grab select-none rounded-lg px-1.5 py-2 text-xl leading-none text-forest-600/70 hover:bg-forest-50 hover:text-forest-900 focus:outline-none focus:ring-2 focus:ring-leaf-600 active:cursor-grabbing"
+                  >
+                    ≡
+                  </span>
+                }
+                onToggle={() =>
+                  setExpandedId((current) =>
+                    current === tree.id ? null : tree.id,
+                  )
+                }
+                onTreeUpdated={handleTreeUpdated}
+                onTreeDeleted={handleTreeDeleted}
+                onStructureChanged={refreshForest}
+                onCelebrate={setCelebratedTree}
+              />
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section aria-labelledby="completed-trees-title">
+        <h2
+          id="completed-trees-title"
+          className="mb-3 text-lg font-semibold text-forest-900"
+        >
+          {dictionary.garden.completedSection}
+        </h2>
+        {completedTrees.length === 0 ? (
+          <p className="rounded-xl bg-forest-50/70 px-4 py-4 text-sm text-forest-600">
+            {dictionary.garden.noCompleted}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-4">
+            {completedTrees.map((tree) => (
+              <TreeCard
+                key={tree.id}
+                tree={tree}
+                expanded={expandedId === tree.id}
+                onToggle={() =>
+                  setExpandedId((current) =>
+                    current === tree.id ? null : tree.id,
+                  )
+                }
+                onTreeUpdated={handleTreeUpdated}
+                onTreeDeleted={handleTreeDeleted}
+                onStructureChanged={refreshForest}
+                onCelebrate={setCelebratedTree}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
       {celebratedTree && (
         <AchievementModal
@@ -104,6 +273,23 @@ export function TreeGarden({ initialTrees, initialForest }: TreeGardenProps) {
       )}
     </div>
   );
+}
+
+function compareActiveTrees(a: TreeDTO, b: TreeDTO) {
+  if (a.manualOrder !== undefined || b.manualOrder !== undefined) {
+    if (a.manualOrder === undefined) return 1;
+    if (b.manualOrder === undefined) return -1;
+    if (a.manualOrder !== b.manualOrder) {
+      return a.manualOrder - b.manualOrder;
+    }
+  }
+  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+}
+
+function compareCompletedTrees(a: TreeDTO, b: TreeDTO) {
+  const aTime = new Date(a.completedAt ?? a.createdAt).getTime();
+  const bTime = new Date(b.completedAt ?? b.createdAt).getTime();
+  return bTime - aTime;
 }
 
 function NewTreeForm({ onCreated }: { onCreated: (tree: TreeDTO) => void }) {
@@ -203,6 +389,7 @@ function NewTreeForm({ onCreated }: { onCreated: (tree: TreeDTO) => void }) {
 function TreeCard({
   tree,
   expanded,
+  dragHandle,
   onToggle,
   onTreeUpdated,
   onTreeDeleted,
@@ -211,6 +398,7 @@ function TreeCard({
 }: {
   tree: TreeDTO;
   expanded: boolean;
+  dragHandle?: ReactNode;
   onToggle: () => void;
   onTreeUpdated: (tree: TreeDTO) => void;
   onTreeDeleted: (treeId: string) => void;
@@ -241,14 +429,12 @@ function TreeCard({
   return (
     <article className="card-surface overflow-hidden">
       <div className="flex items-center justify-between gap-3 p-5 transition-colors hover:bg-forest-50/50 sm:p-6">
+        {dragHandle}
         <button
           type="button"
           onClick={onToggle}
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
-          <span className="text-2xl" aria-hidden>
-            {tree.isCompleted ? "🌟" : "🌳"}
-          </span>
           <div className="min-w-0">
             <h2 className="truncate text-lg font-medium text-forest-900">
               {tree.title}

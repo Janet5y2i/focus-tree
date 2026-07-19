@@ -9,41 +9,66 @@ export const moodSchema = z.enum([
   "tired",
   "anxious",
   "neutral",
+  "sad",
 ]);
 
-export const createMicroLogSchema = z.object({
-  content: z
-    .string()
-    .trim()
-    .min(1, "寫下剛剛完成的一件小事吧")
-    .max(300, "記錄最多 300 字"),
-  treeIds: z
-    .array(objectIdSchema)
-    .max(12, "一次最多連結 12 棵目標樹")
-    .default([]),
-  nodeIds: z
-    .array(objectIdSchema)
-    .max(80, "一次連結的子目標與任務太多了")
-    .default([]),
-  mood: moodSchema.default("neutral"),
-});
+const customMoodSchema = z
+  .string()
+  .trim()
+  .max(40, "自訂心情最多 40 字")
+  .optional();
 
-export const updateMicroLogSchema = z.object({
-  content: z
-    .string()
-    .trim()
-    .min(1, "寫下剛剛完成的一件小事吧")
-    .max(300, "記錄最多 300 字"),
-  mood: moodSchema,
-  treeIds: z
-    .array(objectIdSchema)
-    .max(12, "一次最多連結 12 棵目標樹")
-    .default([]),
-  nodeIds: z
-    .array(objectIdSchema)
-    .max(80, "一次連結的子目標與任務太多了")
-    .default([]),
-});
+const moodsField = z
+  .array(moodSchema)
+  .max(8, "一次最多選 8 種心情")
+  .default([]);
+
+function hasMoodSelection(data: {
+  moods: unknown[];
+  customMood?: string;
+}) {
+  return data.moods.length > 0 || Boolean(data.customMood?.trim());
+}
+
+export const createMicroLogSchema = z
+  .object({
+    content: z
+      .string()
+      .trim()
+      .min(1, "寫下剛剛完成的一件小事吧")
+      .max(300, "記錄最多 300 字"),
+    treeIds: z
+      .array(objectIdSchema)
+      .max(12, "一次最多連結 12 棵目標樹")
+      .default([]),
+    nodeIds: z
+      .array(objectIdSchema)
+      .max(80, "一次連結的子目標與任務太多了")
+      .default([]),
+    moods: moodsField,
+    customMood: customMoodSchema,
+  })
+  .refine(hasMoodSelection, "請選擇至少一種心情，或寫下自訂心情");
+
+export const updateMicroLogSchema = z
+  .object({
+    content: z
+      .string()
+      .trim()
+      .min(1, "寫下剛剛完成的一件小事吧")
+      .max(300, "記錄最多 300 字"),
+    moods: moodsField,
+    customMood: customMoodSchema,
+    treeIds: z
+      .array(objectIdSchema)
+      .max(12, "一次最多連結 12 棵目標樹")
+      .default([]),
+    nodeIds: z
+      .array(objectIdSchema)
+      .max(80, "一次連結的子目標與任務太多了")
+      .default([]),
+  })
+  .refine(hasMoodSelection, "請選擇至少一種心情，或寫下自訂心情");
 
 const dateInputSchema = z
   .string()

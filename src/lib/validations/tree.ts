@@ -58,6 +58,14 @@ export const updateNodeSchema = z
     "沒有可更新的欄位",
   );
 
+export const reorderTreesSchema = z.object({
+  treeIds: z
+    .array(objectIdSchema)
+    .min(1, "請提供至少一棵目標樹")
+    .max(12, "一次最多排序 12 棵目標樹")
+    .refine((ids) => new Set(ids).size === ids.length, "目標樹不可重複"),
+});
+
 export type CreateTreeInput = z.infer<typeof createTreeSchema>;
 export type UpdateTreeInput = z.infer<typeof updateTreeSchema>;
 export type CreateNodeInput = z.infer<typeof createNodeSchema>;

@@ -1,6 +1,11 @@
 export type ReviewPresetPeriod = "weekly" | "biweekly" | "monthly";
 export type ReviewPeriod = ReviewPresetPeriod | "custom";
 
+export interface ReviewHighlight {
+  content: string;
+  loggedAt: string;
+}
+
 export interface ReviewStats {
   from: string;
   to: string;
@@ -10,7 +15,7 @@ export interface ReviewStats {
   treesNurtured: number;
   activeDays: number;
   topTree?: { title: string; leaves: number };
-  highlights: string[];
+  highlights: ReviewHighlight[];
 }
 
 export interface ReviewResponse {

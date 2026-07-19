@@ -12,6 +12,7 @@ export function toTreeDTO(tree: IGoalTree): TreeDTO {
     status: tree.status,
     isCompleted: tree.isCompleted,
     completedAt: tree.completedAt?.toISOString(),
+    manualOrder: tree.manualOrder,
     stats: {
       leafCount: tree.stats.leafCount,
       fruitCount: tree.stats.fruitCount,
@@ -39,10 +40,19 @@ export function toNodeDTO(node: IGoalNode): NodeDTO {
 }
 
 export function toMicroLogDTO(log: IMicroLog): MicroLogDTO {
+  // 舊資料只有單一 mood；新資料用 moods 陣列。
+  const moods =
+    log.moods && log.moods.length > 0
+      ? log.moods
+      : log.mood
+        ? [log.mood]
+        : [];
+
   return {
     id: log._id.toString(),
     content: log.content,
-    mood: log.mood,
+    moods,
+    customMood: log.customMood?.trim() || undefined,
     treeIds: log.treeIds.map((treeId) => treeId.toString()),
     nodeLinks: log.nodeLinks.map((link) => ({
       treeId: link.treeId.toString(),
