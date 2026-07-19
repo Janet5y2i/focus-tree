@@ -21,6 +21,34 @@ export const zhTW = {
     zh: "中文",
     en: "English",
   },
+  guide: {
+    button: "使用教學",
+    title: "使用教學",
+    close: "知道了",
+    treesSection: "我的樹",
+    treesPlantTitle: "種一棵新樹",
+    treesPlantBody:
+      "建立一棵目標樹，這是一個你想達成的大目標。",
+    treesExpandTitle: "展開樹",
+    treesExpandBody:
+      "為了達成這個大目標，你可以先幫自己設立幾個小目標，時不時回來看看自己有沒有在實踐這些小目標。",
+    treesTaskTitle: "加上任務",
+    treesTaskBody:
+      "為了達成這些小目標，為自己設立一些任務吧。記住，這不是 to-do list，這是一個提醒自己：為了達成目標，我們要實踐的方向。",
+    treesRecurringTitle: "打開經常性",
+    treesRecurringBody:
+      "有些任務很小、很重複。打開它之後，記錄時可以快速帶入，就不用重複打字囉。",
+    logSection: "記錄",
+    logIntro:
+      "再微小都值得記下。喝一杯水、深呼吸一次，也都是你照顧自己的證明。",
+    logHowTo:
+      "在輸入框中記錄做了什麼，可以是一句話，也可以是你的碎碎念。記錄你的心情，以及看看這些瑣碎的小事是不是連結到了哪些你設定的目標與任務。就算現在沒有任何關聯也沒有關係——記住，現在走的每一小步都是未來成長的養分；突然覺得有關聯時，可以再回來編輯喔！",
+    logHistoryTitle: "已經走過的腳步",
+    logHistoryBody: "透過這些篩選，來看看自己已經努力了多少吧！",
+    reviewSection: "回顧",
+    reviewBody:
+      "每過一段時間，回頭看看不知不覺中你幫自己累積了多少吧。",
+  },
   nav: {
     trees: "我的樹",
     log: "記錄",

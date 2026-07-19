@@ -23,6 +23,34 @@ export const en: Dictionary = {
     zh: "中文",
     en: "English",
   },
+  guide: {
+    button: "How to use",
+    title: "How to use",
+    close: "Got it",
+    treesSection: "My Trees",
+    treesPlantTitle: "Plant a new tree",
+    treesPlantBody:
+      "Create a goal tree—this is a big goal you want to grow toward.",
+    treesExpandTitle: "Expand a tree",
+    treesExpandBody:
+      "To move toward that big goal, set a few smaller goals for yourself, and check back now and then to see how you’re practicing them.",
+    treesTaskTitle: "Add a task",
+    treesTaskBody:
+      "To support those smaller goals, give yourself some tasks. Remember: this isn’t a to-do list. It’s a gentle reminder of the directions you want to practice.",
+    treesRecurringTitle: "Turn on recurring",
+    treesRecurringBody:
+      "Some tasks are small and repeat often. Turn this on so you can fill them into a log quickly—no need to type the same thing again.",
+    logSection: "Log",
+    logIntro:
+      "Even tiny moments are worth recording. A glass of water or one deep breath is still proof you cared for yourself.",
+    logHowTo:
+      "In the text box, write what you did—one sentence or a little ramble. Note your mood, and see whether these small moments connect to any goals or tasks you’ve set. It’s okay if there’s no link right now. Every small step is nourishment for future growth, and you can always come back to edit when a connection becomes clear.",
+    logHistoryTitle: "Steps you’ve already taken",
+    logHistoryBody: "Use the filters to see how much you’ve already put in.",
+    reviewSection: "Review",
+    reviewBody:
+      "Every so often, look back and notice how much you’ve quietly accumulated for yourself.",
+  },
   nav: {
     trees: "My Trees",
     log: "Log",

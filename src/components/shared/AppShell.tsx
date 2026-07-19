@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { HowToGuideButton } from "@/components/shared/HowToGuideButton";
 import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
 import { useLocale } from "@/i18n/locale-context";
 import type { SafeUser } from "@/models/User";
@@ -46,6 +47,7 @@ export function AppShell({ user, children }: AppShellProps) {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <HowToGuideButton />
             <LanguageSwitcher />
             <span className="hidden text-sm text-forest-600 sm:inline">
               {user.displayName}
