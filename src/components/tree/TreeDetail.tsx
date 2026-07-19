@@ -169,6 +169,8 @@ function BranchSection({
   onChanged: (tree?: TreeDTO) => void;
 }) {
   const { dictionary, t } = useLocale();
+  const [expanded, setExpanded] = useState(false);
+
   async function handleDeleteBranch() {
     if (
       tasks.length > 0 &&
@@ -191,7 +193,22 @@ function BranchSection({
   return (
     <section className="rounded-xl bg-forest-50/60 p-4">
       <div className="flex items-center justify-between gap-3">
-        <h3 className="font-medium text-forest-800">🌿 {branch.title}</h3>
+        <button
+          type="button"
+          onClick={() => setExpanded((current) => !current)}
+          aria-expanded={expanded}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left font-medium text-forest-800 transition-colors hover:text-leaf-800"
+        >
+          <span aria-hidden className="text-xs text-forest-500">
+            {expanded ? "▾" : "▸"}
+          </span>
+          <span className="min-w-0 truncate">🌿 {branch.title}</span>
+          {!expanded && tasks.length > 0 && (
+            <span className="shrink-0 text-xs font-normal text-forest-500">
+              ({tasks.length})
+            </span>
+          )}
+        </button>
         <button
           type="button"
           onClick={handleDeleteBranch}
@@ -204,27 +221,31 @@ function BranchSection({
         </button>
       </div>
 
-      <ul className="mt-3 flex flex-col gap-2">
-        {tasks.map((task) => (
-          <TaskRow
-            key={task.id}
-            treeId={treeId}
-            task={task}
-            onChanged={onChanged}
-          />
-        ))}
-      </ul>
+      {expanded && (
+        <>
+          <ul className="mt-3 flex flex-col gap-2">
+            {tasks.map((task) => (
+              <TaskRow
+                key={task.id}
+                treeId={treeId}
+                task={task}
+                onChanged={onChanged}
+              />
+            ))}
+          </ul>
 
-      <div className="mt-3">
-        <AddNodeForm
-          treeId={treeId}
-          parentId={branch.id}
-          placeholder={dictionary.treeDetail.taskPlaceholder}
-          buttonLabel={dictionary.treeDetail.addTask}
-          compact
-          onAdded={() => onChanged()}
-        />
-      </div>
+          <div className="mt-3">
+            <AddNodeForm
+              treeId={treeId}
+              parentId={branch.id}
+              placeholder={dictionary.treeDetail.taskPlaceholder}
+              buttonLabel={dictionary.treeDetail.addTask}
+              compact
+              onAdded={() => onChanged()}
+            />
+          </div>
+        </>
+      )}
     </section>
   );
 }
