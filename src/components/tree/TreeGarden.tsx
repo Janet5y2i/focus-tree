@@ -71,9 +71,6 @@ export function TreeGarden({ initialTrees, initialForest }: TreeGardenProps) {
       {forest.length > 0 && (
         <section className="card-surface overflow-hidden p-4 sm:p-5">
           <ForestScene forest={forest} />
-          <p className="mt-3 text-xs text-forest-600">
-            樹幹是主目標、樹枝是子目標；記下的每一步會在對應的樹枝長出葉子，勾選完成的任務則結成果實。
-          </p>
         </section>
       )}
 

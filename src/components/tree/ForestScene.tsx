@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type {
   ForestBranchData,
   ForestTreeData,
@@ -45,6 +48,7 @@ function quadraticPoint(
 
 export function ForestScene({ forest }: { forest: ForestTreeData[] }) {
   const width = Math.max(720, forest.length * TREE_SLOT_WIDTH + 60);
+  const [selectedTreeId, setSelectedTreeId] = useState<string | null>(null);
 
   return (
     <div className="overflow-x-auto rounded-2xl border border-forest-100/80">
@@ -104,6 +108,12 @@ export function ForestScene({ forest }: { forest: ForestTreeData[] }) {
             key={tree.id}
             tree={tree}
             x={TREE_SLOT_WIDTH * index + TREE_SLOT_WIDTH / 2 + 30}
+            selected={selectedTreeId === tree.id}
+            onSelect={() =>
+              setSelectedTreeId((current) =>
+                current === tree.id ? null : tree.id,
+              )
+            }
           />
         ))}
       </svg>
@@ -141,16 +151,45 @@ function Meadow({ width }: { width: number }) {
   );
 }
 
-function TreeFigure({ tree, x }: { tree: ForestTreeData; x: number }) {
+function TreeFigure({
+  tree,
+  x,
+  selected,
+  onSelect,
+}: {
+  tree: ForestTreeData;
+  x: number;
+  selected: boolean;
+  onSelect: () => void;
+}) {
   const branchCount = tree.branches.length;
   const trunkHeight = Math.min(125 + branchCount * 22, 235);
   const trunkTopY = GROUND_Y - trunkHeight;
 
-  const title =
-    tree.title.length > 11 ? `${tree.title.slice(0, 10)}…` : tree.title;
-
   return (
-    <g transform={`translate(${x} 0)`}>
+    <g
+      transform={`translate(${x} 0)`}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label={`${tree.title}${selected ? "（點擊隱藏名稱）" : "（點擊顯示名稱）"}`}
+      className="cursor-pointer focus:outline-none"
+    >
+      {/* 點擊判定範圍：涵蓋整棵樹的透明區域 */}
+      <rect
+        x={-TREE_SLOT_WIDTH / 2 + 10}
+        y={trunkTopY - 44}
+        width={TREE_SLOT_WIDTH - 20}
+        height={trunkHeight + 60}
+        fill="transparent"
+      />
+
       {/* 樹影 */}
       <ellipse
         cx={0}
@@ -208,15 +247,51 @@ function TreeFigure({ tree, x }: { tree: ForestTreeData; x: number }) {
         </text>
       )}
 
+      {/* 點擊樹之後才顯示主目標名稱 */}
+      {selected && <TreeNameLabel title={tree.title} trunkTopY={trunkTopY} />}
+    </g>
+  );
+}
+
+function TreeNameLabel({
+  title,
+  trunkTopY,
+}: {
+  title: string;
+  trunkTopY: number;
+}) {
+  // 依字數估算泡泡寬度（中文字約 14px、含左右留白）
+  const boxWidth = Math.min(Math.max(title.length * 14 + 28, 72), 240);
+  const display =
+    title.length > 15 ? `${title.slice(0, 14)}…` : title;
+  // 高樹的泡泡可能超出畫面頂端，往下夾住
+  const boxY = Math.max(trunkTopY - 76, 8);
+
+  return (
+    <g aria-hidden>
+      <rect
+        x={-boxWidth / 2}
+        y={boxY}
+        width={boxWidth}
+        height={30}
+        rx={15}
+        fill="#2f4525"
+        opacity={0.92}
+      />
+      <path
+        d={`M -6 ${boxY + 30} L 0 ${boxY + 38} L 6 ${boxY + 30} Z`}
+        fill="#2f4525"
+        opacity={0.92}
+      />
       <text
         x={0}
-        y={GROUND_Y + 28}
+        y={boxY + 20}
         textAnchor="middle"
-        fontSize={13}
-        fill="#2f4525"
+        fontSize={13.5}
+        fill="#f6fbef"
         fontWeight={600}
       >
-        {title}
+        {display}
       </text>
     </g>
   );
