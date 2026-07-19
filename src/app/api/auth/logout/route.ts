@@ -1,7 +1,1 @@
-import { clearSessionCookie } from "@/lib/auth/session";
-import { jsonSuccess } from "@/lib/api/response";
-
-export async function POST() {
-  await clearSessionCookie();
-  return jsonSuccess({ ok: true });
-}
+export { logout as POST } from "@/controllers/auth-controller";

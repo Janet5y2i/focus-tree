@@ -43,20 +43,32 @@ npm run dev
 - Session 以 **JWT** 簽發，存放於 **httpOnly + SameSite=Lax** Cookie
 - Production 環境 Cookie 自動加上 `Secure` flag
 - API 回應僅返回 `SafeUser`（不含 `passwordHash`）
-- Middleware 保護所有頁面與 API（`/login`、`/register` 除外）
+- Proxy 保護所有頁面與 API（認證與重設密碼公開路由除外）
+
+## MVC 架構
+
+本專案在 Next.js App Router 的檔案路由規則上採用 MVC 分層：
+
+- **Model**：`src/models/` 的 Mongoose 文件模型，以及 `src/lib/` 中操作資料的領域服務、驗證與 DTO 轉換。
+- **View**：`src/app/**/page.tsx`、layouts 與 `src/components/`，負責 Server/Client Components 和畫面互動。
+- **Controller**：`src/controllers/`，負責驗證 HTTP 輸入、呼叫 Model／領域服務，並組成 API 回應。
+- **Route adapter**：`src/app/api/**/route.ts` 只把 App Router 的 HTTP method 對應到 Controller，不放業務邏輯。
+
+依賴方向為 `Route → Controller → Model/Service`；View 透過 API 與 Controller 溝通。
 
 ## 專案結構
 
 ```
 src/
 ├── app/
-│   ├── (auth)/          # 登入、註冊
+│   ├── (auth)/          # 登入、註冊與重設密碼 Views
 │   ├── (protected)/     # 需登入的頁面
-│   └── api/auth/        # 認證 API
-├── components/
-├── lib/auth/            # bcrypt, JWT, session
-├── models/              # Mongoose schemas
-└── middleware.ts        # 路由保護
+│   └── api/             # 薄 Route adapters
+├── components/          # 共用與互動 Views
+├── controllers/         # API Controllers
+├── lib/                 # 領域服務、驗證、DTO 與基礎設施
+├── models/              # Mongoose Models
+└── proxy.ts             # 路由保護
 ```
 
 ## Scripts
