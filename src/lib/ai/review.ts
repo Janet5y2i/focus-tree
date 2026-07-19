@@ -1,4 +1,5 @@
 import type { Locale } from "@/i18n/config";
+import { highlightsForPrompt } from "@/lib/review/aggregate";
 import type { ReviewPeriod, ReviewStats } from "@/lib/types/review";
 
 interface SummaryResult {
@@ -125,9 +126,10 @@ function buildUserPrompt(
   locale: Locale,
 ): string {
   if (locale === "en") {
+    const highlightLines = highlightsForPrompt(stats.highlights);
     const highlights =
-      stats.highlights.length > 0
-        ? stats.highlights.map((highlight) => `- ${highlight}`).join("\n")
+      highlightLines.length > 0
+        ? highlightLines.map((highlight) => `- ${highlight}`).join("\n")
         : "(There are no written logs for this period, but every moment still counts.)";
 
     return `User name: ${displayName}
@@ -145,9 +147,10 @@ ${highlights}
 Write a warm growth reflection based on this information.`;
   }
 
+  const highlightLines = highlightsForPrompt(stats.highlights);
   const highlights =
-    stats.highlights.length > 0
-      ? stats.highlights.map((h) => `- ${h}`).join("\n")
+    highlightLines.length > 0
+      ? highlightLines.map((h) => `- ${h}`).join("\n")
       : "（這段期間沒有文字記錄，但每個當下都算數）";
 
   return `使用者名稱：${displayName}

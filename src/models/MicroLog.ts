@@ -1,4 +1,16 @@
 import mongoose, { Schema, type Document, type Model, Types } from "mongoose";
+import type { MicroLogMood } from "@/lib/types/micro-log";
+
+const PRESET_MOODS: MicroLogMood[] = [
+  "calm",
+  "grateful",
+  "focused",
+  "joyful",
+  "tired",
+  "anxious",
+  "neutral",
+  "sad",
+];
 
 const NodeLinkSchema = new Schema(
   {
@@ -14,14 +26,10 @@ const NodeLinkSchema = new Schema(
 export interface IMicroLog extends Document {
   userId: Types.ObjectId;
   content: string;
-  mood:
-    | "calm"
-    | "grateful"
-    | "focused"
-    | "joyful"
-    | "tired"
-    | "anxious"
-    | "neutral";
+  /** @deprecated 舊資料單一心情；新寫入請用 moods */
+  mood?: MicroLogMood;
+  moods: MicroLogMood[];
+  customMood?: string;
   treeIds: Types.ObjectId[];
   nodeLinks: Array<{
     treeId: Types.ObjectId;
@@ -40,19 +48,16 @@ const MicroLogSchema = new Schema<IMicroLog>(
   {
     userId: { type: Schema.Types.ObjectId, ref: "User", required: true, index: true },
     content: { type: String, required: true, maxlength: 300 },
+    // 保留舊欄位以相容既有文件；新寫入改存 moods。
     mood: {
       type: String,
-      enum: [
-        "calm",
-        "grateful",
-        "focused",
-        "joyful",
-        "tired",
-        "anxious",
-        "neutral",
-      ],
-      default: "neutral",
+      enum: PRESET_MOODS,
     },
+    moods: {
+      type: [{ type: String, enum: PRESET_MOODS }],
+      default: [],
+    },
+    customMood: { type: String, maxlength: 40 },
     treeIds: [{ type: Schema.Types.ObjectId, ref: "GoalTree" }],
     nodeLinks: [NodeLinkSchema],
     leafEmittedForTreeIds: [{ type: Schema.Types.ObjectId, ref: "GoalTree" }],
@@ -64,6 +69,7 @@ const MicroLogSchema = new Schema<IMicroLog>(
 MicroLogSchema.index({ userId: 1, loggedAt: -1 });
 MicroLogSchema.index({ userId: 1, createdAt: -1 });
 MicroLogSchema.index({ userId: 1, mood: 1, createdAt: -1 });
+MicroLogSchema.index({ userId: 1, moods: 1, createdAt: -1 });
 MicroLogSchema.index({ userId: 1, treeIds: 1, createdAt: -1 });
 MicroLogSchema.index({ userId: 1, "nodeLinks.nodeId": 1, createdAt: -1 });
 

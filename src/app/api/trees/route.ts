@@ -41,10 +41,21 @@ export async function POST(request: Request) {
       );
     }
 
+    const firstManuallyOrdered = await GoalTree.findOne({
+      userId: session.sub,
+      isCompleted: false,
+      manualOrder: { $exists: true },
+    }).sort({ manualOrder: 1 });
+
     const tree = await GoalTree.create({
       userId: session.sub,
       title: parsed.data.title,
       description: parsed.data.description,
+      // 使用者排序過後，新樹仍預設放在進行中清單最前面。
+      manualOrder:
+        firstManuallyOrdered?.manualOrder !== undefined
+          ? firstManuallyOrdered.manualOrder - 1
+          : undefined,
     });
 
     return jsonSuccess({ tree: toTreeDTO(tree) }, 201);

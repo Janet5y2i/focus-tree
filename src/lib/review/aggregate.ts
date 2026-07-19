@@ -4,7 +4,7 @@ import { MicroLog } from "@/models/MicroLog";
 import type { ReviewPeriod, ReviewStats } from "@/lib/types/review";
 import { PERIOD_DAYS } from "@/lib/validations/review";
 
-const MAX_HIGHLIGHTS = 4;
+const MAX_HIGHLIGHTS_FOR_AI = 12;
 
 /**
  * 彙整某段期間的「成長」資料。
@@ -60,10 +60,13 @@ export async function buildReviewStats(
 
   const topTree = await resolveTopTree(userId, leavesPerTree);
 
+  // 該期間所有有文字的微小記錄，由新到舊；完整列表給 UI，AI 只取較新幾則避免 prompt 過長。
   const highlights = logs
     .filter((log) => log.content.trim().length > 0)
-    .slice(0, MAX_HIGHLIGHTS)
-    .map((log) => log.content.trim());
+    .map((log) => ({
+      content: log.content.trim(),
+      loggedAt: log.loggedAt.toISOString(),
+    }));
 
   return {
     from: from.toISOString(),
@@ -76,6 +79,12 @@ export async function buildReviewStats(
     topTree,
     highlights,
   };
+}
+
+export function highlightsForPrompt(
+  highlights: ReviewStats["highlights"],
+): string[] {
+  return highlights.slice(0, MAX_HIGHLIGHTS_FOR_AI).map((item) => item.content);
 }
 
 async function resolveTopTree(

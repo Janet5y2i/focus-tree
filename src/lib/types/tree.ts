@@ -14,6 +14,7 @@ export interface TreeDTO {
   status: TreeStatus;
   isCompleted: boolean;
   completedAt?: string;
+  manualOrder?: number;
   stats: TreeStats;
   createdAt: string;
 }

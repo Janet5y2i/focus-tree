@@ -63,6 +63,17 @@ export async function PATCH(request: Request, { params }: Context) {
     if (parsed.data.isCompleted !== undefined) {
       tree.isCompleted = parsed.data.isCompleted;
       tree.completedAt = parsed.data.isCompleted ? new Date() : undefined;
+      if (!parsed.data.isCompleted) {
+        const firstManuallyOrdered = await GoalTree.findOne({
+          _id: { $ne: tree._id },
+          userId: session.sub,
+          isCompleted: false,
+          manualOrder: { $exists: true },
+        }).sort({ manualOrder: 1 });
+        if (firstManuallyOrdered?.manualOrder !== undefined) {
+          tree.manualOrder = firstManuallyOrdered.manualOrder - 1;
+        }
+      }
     }
     await tree.save();
 

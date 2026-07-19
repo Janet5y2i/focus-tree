@@ -68,7 +68,11 @@ export async function PATCH(request: Request, { params }: Context) {
     );
 
     log.content = parsed.data.content;
-    log.mood = parsed.data.mood;
+    log.moods = [...new Set(parsed.data.moods)];
+    // 空字串表示清除自訂心情。
+    log.customMood = parsed.data.customMood?.trim() || "";
+    // 清除舊單一心情欄位，避免與 moods 不一致。
+    log.set("mood", undefined);
     log.treeIds = ownedTreeIds;
     log.nodeLinks = ownedNodes.map((node) => ({
       treeId: node.treeId,

@@ -5,7 +5,8 @@ export type MicroLogMood =
   | "joyful"
   | "tired"
   | "anxious"
-  | "neutral";
+  | "neutral"
+  | "sad";
 
 export interface MicroLogNodeLinkDTO {
   treeId: string;
@@ -17,7 +18,8 @@ export interface MicroLogNodeLinkDTO {
 export interface MicroLogDTO {
   id: string;
   content: string;
-  mood: MicroLogMood;
+  moods: MicroLogMood[];
+  customMood?: string;
   treeIds: string[];
   nodeLinks: MicroLogNodeLinkDTO[];
   loggedAt: string;
