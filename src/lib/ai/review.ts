@@ -1,4 +1,4 @@
-import { PERIOD_LABEL } from "@/lib/validations/review";
+import type { Locale } from "@/i18n/config";
 import type { ReviewPeriod, ReviewStats } from "@/lib/types/review";
 
 interface SummaryResult {
@@ -18,18 +18,20 @@ export async function generateReviewSummary(
   displayName: string,
   period: ReviewPeriod,
   stats: ReviewStats,
+  locale: Locale = "zh-TW",
 ): Promise<SummaryResult> {
-  const aiSummary = await tryOpenAISummary(displayName, period, stats);
+  const aiSummary = await tryOpenAISummary(displayName, period, stats, locale);
   if (aiSummary) {
     return { summary: aiSummary, generatedBy: "ai" };
   }
   return {
-    summary: buildReflection(displayName, period, stats),
+    summary: buildReflection(displayName, period, stats, locale),
     generatedBy: "reflection",
   };
 }
 
-const SYSTEM_PROMPT = `你是一個心靈成長 App「Focus Tree」的溫柔陪伴者。
+const SYSTEM_PROMPTS: Record<Locale, string> = {
+  "zh-TW": `你是一個心靈成長 App「Focus Tree」的溫柔陪伴者。
 你的任務是為使用者總結他們這段期間累積的微小實踐，語氣要溫暖、真誠、具體、鼓勵。
 
 嚴格鐵律（違反即失敗）：
@@ -37,12 +39,38 @@ const SYSTEM_PROMPT = `你是一個心靈成長 App「Focus Tree」的溫柔陪�
 - 不要催促、不要設定期待、不要給待辦建議。
 - 只聚焦於「使用者已經做到了什麼」，讓他感到被看見。
 - 用第二人稱「你」，繁體中文，2 到 3 段短文，總長度約 120-200 字。
-- 可以自然地用「葉子、果實、樹、成長」等意象，但不要濫用。`;
+- 可以自然地用「葉子、果實、樹、成長」等意象，但不要濫用。`,
+  en: `You are a gentle companion in the personal-growth app “Focus Tree.”
+Summarize the small practices the user accumulated during this period in a warm, sincere, specific, and encouraging voice.
+
+Strict rules:
+- Never mention anything unfinished, not done, overdue, behind schedule, expected, or needing more effort.
+- Do not push, set expectations, give advice, or suggest to-dos.
+- Focus only on what the user has already done so they feel seen.
+- Address the user as “you.” Write 2–3 short paragraphs in English, about 100–160 words total.
+- You may naturally use images of leaves, fruit, trees, and growth, but do not overuse them.`,
+};
+
+const PERIOD_LABELS: Record<Locale, Record<ReviewPeriod, string>> = {
+  "zh-TW": {
+    weekly: "這一週",
+    biweekly: "這兩週",
+    monthly: "這個月",
+    custom: "這段時間",
+  },
+  en: {
+    weekly: "this week",
+    biweekly: "these two weeks",
+    monthly: "this month",
+    custom: "this period",
+  },
+};
 
 async function tryOpenAISummary(
   displayName: string,
   period: ReviewPeriod,
   stats: ReviewStats,
+  locale: Locale,
 ): Promise<string | null> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
@@ -62,8 +90,11 @@ async function tryOpenAISummary(
         model,
         temperature: 0.8,
         messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: buildUserPrompt(displayName, period, stats) },
+          { role: "system", content: SYSTEM_PROMPTS[locale] },
+          {
+            role: "user",
+            content: buildUserPrompt(displayName, period, stats, locale),
+          },
         ],
       }),
       signal: controller.signal,
@@ -91,14 +122,36 @@ function buildUserPrompt(
   displayName: string,
   period: ReviewPeriod,
   stats: ReviewStats,
+  locale: Locale,
 ): string {
+  if (locale === "en") {
+    const highlights =
+      stats.highlights.length > 0
+        ? stats.highlights.map((highlight) => `- ${highlight}`).join("\n")
+        : "(There are no written logs for this period, but every moment still counts.)";
+
+    return `User name: ${displayName}
+Review period: ${PERIOD_LABELS.en[period]}
+Small practices logged during this period: ${stats.logCount}
+Leaves grown (practices related to goals): ${stats.leafCount}
+Fruit borne (completed tasks): ${stats.fruitCount}
+Goal trees nurtured: ${stats.treesNurtured}
+Days with logs: ${stats.activeDays}
+${stats.topTree ? `Most nurtured tree: “${stats.topTree.title}” (${stats.topTree.leaves} leaves)` : ""}
+
+Some completed practices:
+${highlights}
+
+Write a warm growth reflection based on this information.`;
+  }
+
   const highlights =
     stats.highlights.length > 0
       ? stats.highlights.map((h) => `- ${h}`).join("\n")
       : "（這段期間沒有文字記錄，但每個當下都算數）";
 
   return `使用者名稱：${displayName}
-回顧期間：${PERIOD_LABEL[period]}
+回顧期間：${PERIOD_LABELS["zh-TW"][period]}
 這段期間的微小實踐紀錄數：${stats.logCount}
 長出的葉子（與目標相關的實踐）：${stats.leafCount}
 結出的果實（完成的任務）：${stats.fruitCount}
@@ -116,8 +169,47 @@ function buildReflection(
   displayName: string,
   period: ReviewPeriod,
   stats: ReviewStats,
+  locale: Locale,
 ): string {
-  const label = PERIOD_LABEL[period];
+  const label = PERIOD_LABELS[locale][period];
+
+  if (locale === "en") {
+    const name = displayName.trim() || "You";
+
+    if (stats.logCount === 0) {
+      return `${name}, you may not have left many written notes ${label}, but that doesn’t mean nothing happened.\n\nResting, breathing, and simply making it through are forms of movement too. This forest will be here whenever you want to return, ready to hold a new leaf.`;
+    }
+
+    const parts = [
+      `${name}, ${label} you quietly gathered ${stats.logCount} completed ${stats.logCount === 1 ? "practice" : "practices"}. These small moments are real signs that you have been showing up for yourself.`,
+    ];
+    const growth: string[] = [];
+    if (stats.leafCount > 0)
+      growth.push(`${stats.leafCount} new ${stats.leafCount === 1 ? "leaf" : "leaves"}`);
+    if (stats.fruitCount > 0)
+      growth.push(`${stats.fruitCount} ${stats.fruitCount === 1 ? "fruit" : "fruits"}`);
+    if (stats.treesNurtured > 0)
+      growth.push(
+        `${stats.treesNurtured} ${stats.treesNurtured === 1 ? "tree" : "trees"} gently nurtured`,
+      );
+
+    if (growth.length > 0) {
+      let sentence = `Without fanfare, your forest grew: ${growth.join(", ")}`;
+      if (stats.topTree) {
+        sentence += `, with “${stats.topTree.title}” especially flourishing under your care`;
+      }
+      parts.push(`${sentence}.`);
+    }
+
+    parts.push(
+      stats.activeDays > 1
+        ? `You returned to the present on ${stats.activeDays} different days. That steady kindness matters. Be proud of who you are right now.`
+        : "Every step counts. Be proud of who you are right now.",
+    );
+
+    return parts.join("\n\n");
+  }
+
   const name = displayName.trim() || "你";
 
   if (stats.logCount === 0) {

@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { localizeApiError } from "@/i18n/api-errors";
+import { useLocale } from "@/i18n/locale-context";
 import type { TreeDTO } from "@/lib/types/tree";
 import type { ForestTreeData } from "@/lib/types/forest";
 import { TreeDetail } from "./TreeDetail";
@@ -12,6 +14,7 @@ interface TreeGardenProps {
 }
 
 export function TreeGarden({ initialTrees, initialForest }: TreeGardenProps) {
+  const { dictionary, t } = useLocale();
   const [trees, setTrees] = useState<TreeDTO[]>(initialTrees);
   const [forest, setForest] = useState<ForestTreeData[]>(initialForest);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -51,12 +54,12 @@ export function TreeGarden({ initialTrees, initialForest }: TreeGardenProps) {
       <section className="card-surface flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
         <div>
           <h1 className="text-2xl font-semibold text-forest-900 sm:text-3xl">
-            我的成長森林
+            {dictionary.garden.title}
           </h1>
           <p className="mt-2 text-forest-600">
             {trees.length === 0
-              ? "還沒有樹。種下第一棵，代表一個你想靠近的方向。"
-              : `你正在照顧 ${trees.length} 棵樹。每一片葉子都是你已經走過的路。`}
+              ? dictionary.garden.empty
+              : t(dictionary.garden.caring, { count: trees.length })}
           </p>
         </div>
         <button
@@ -64,7 +67,7 @@ export function TreeGarden({ initialTrees, initialForest }: TreeGardenProps) {
           onClick={() => setShowForm((v) => !v)}
           className="btn-ghost shrink-0"
         >
-          {showForm ? "先不種" : "🌱 種一棵新樹"}
+          {showForm ? dictionary.garden.notNow : dictionary.garden.plantNew}
         </button>
       </section>
 
@@ -104,6 +107,7 @@ export function TreeGarden({ initialTrees, initialForest }: TreeGardenProps) {
 }
 
 function NewTreeForm({ onCreated }: { onCreated: (tree: TreeDTO) => void }) {
+  const { locale, dictionary } = useLocale();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +130,13 @@ function NewTreeForm({ onCreated }: { onCreated: (tree: TreeDTO) => void }) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error ?? "種樹失敗，請稍後再試");
+        setError(
+          localizeApiError(
+            data.error,
+            locale,
+            dictionary.garden.plantFailed,
+          ),
+        );
         return;
       }
 
@@ -134,7 +144,7 @@ function NewTreeForm({ onCreated }: { onCreated: (tree: TreeDTO) => void }) {
       setDescription("");
       onCreated(data.tree);
     } catch {
-      setError("網路連線失敗，請稍後再試");
+      setError(dictionary.common.networkError);
     } finally {
       setLoading(false);
     }
@@ -147,7 +157,7 @@ function NewTreeForm({ onCreated }: { onCreated: (tree: TreeDTO) => void }) {
     >
       <label className="flex flex-col gap-2">
         <span className="text-sm font-medium text-forest-800">
-          這棵樹代表什麼目標？
+          {dictionary.garden.goalLabel}
         </span>
         <input
           type="text"
@@ -156,13 +166,13 @@ function NewTreeForm({ onCreated }: { onCreated: (tree: TreeDTO) => void }) {
           required
           maxLength={120}
           className="input-field"
-          placeholder="例如：成為更健康的自己"
+          placeholder={dictionary.garden.goalPlaceholder}
         />
       </label>
 
       <label className="flex flex-col gap-2">
         <span className="text-sm font-medium text-forest-800">
-          想對未來的自己說什麼？（選填）
+          {dictionary.garden.noteLabel}
         </span>
         <textarea
           value={description}
@@ -170,7 +180,7 @@ function NewTreeForm({ onCreated }: { onCreated: (tree: TreeDTO) => void }) {
           maxLength={500}
           rows={2}
           className="input-field resize-none"
-          placeholder="為什麼這個方向對你重要？"
+          placeholder={dictionary.garden.notePlaceholder}
         />
       </label>
 
@@ -184,7 +194,7 @@ function NewTreeForm({ onCreated }: { onCreated: (tree: TreeDTO) => void }) {
       )}
 
       <button type="submit" disabled={loading} className="btn-primary">
-        {loading ? "種植中…" : "種下這棵樹"}
+        {loading ? dictionary.garden.planting : dictionary.garden.plant}
       </button>
     </form>
   );
@@ -207,6 +217,7 @@ function TreeCard({
   onStructureChanged: () => void;
   onCelebrate: (tree: TreeDTO) => void;
 }) {
+  const { dictionary } = useLocale();
   const [updating, setUpdating] = useState(false);
 
   async function toggleAchievement() {
@@ -252,10 +263,14 @@ function TreeCard({
 
         <div className="flex shrink-0 items-center gap-3 text-sm text-forest-600">
           {tree.stats.leafCount > 0 && (
-            <span title="累積的微小實踐">🍃 {tree.stats.leafCount}</span>
+            <span title={dictionary.garden.leafTitle}>
+              🍃 {tree.stats.leafCount}
+            </span>
           )}
           {tree.stats.fruitCount > 0 && (
-            <span title="目前完成的任務">🍎 {tree.stats.fruitCount}</span>
+            <span title={dictionary.garden.fruitTitle}>
+              🍎 {tree.stats.fruitCount}
+            </span>
           )}
           <button
             type="button"
@@ -267,14 +282,18 @@ function TreeCard({
                 : "border border-forest-100 bg-white text-forest-700 hover:bg-forest-50"
             }`}
           >
-            {updating ? "…" : tree.isCompleted ? "✓ 已達成" : "標示達成"}
+            {updating
+              ? dictionary.common.loadingEllipsis
+              : tree.isCompleted
+                ? dictionary.garden.achieved
+                : dictionary.garden.markAchieved}
           </button>
           <button
             type="button"
             onClick={onToggle}
             className="text-forest-600/60"
           >
-            {expanded ? "收起" : "展開"}
+            {expanded ? dictionary.common.collapse : dictionary.common.expand}
           </button>
         </div>
       </div>
@@ -298,6 +317,7 @@ function AchievementModal({
   tree: TreeDTO;
   onClose: () => void;
 }) {
+  const { dictionary } = useLocale();
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-forest-900/35 p-4 backdrop-blur-sm"
@@ -317,16 +337,16 @@ function AchievementModal({
           id="achievement-title"
           className="mt-5 text-2xl font-semibold text-forest-900"
         >
-          恭喜你達成了這個目標！
+          {dictionary.garden.celebrateTitle}
         </h2>
         <p className="mt-3 text-lg font-medium text-leaf-700">
           「{tree.title}」
         </p>
         <p className="mt-4 leading-relaxed text-forest-600">
-          每一片葉子、每一顆果實，都是你真實走過的路。請好好收藏這份屬於你的成長。
+          {dictionary.garden.celebrateBody}
         </p>
         <button type="button" onClick={onClose} className="btn-primary mt-6">
-          收下這份喜悅
+          {dictionary.garden.celebrateClose}
         </button>
       </div>
     </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useLocale } from "@/i18n/locale-context";
 import type {
   ForestBranchData,
   ForestTreeData,
@@ -47,6 +48,7 @@ function quadraticPoint(
 }
 
 export function ForestScene({ forest }: { forest: ForestTreeData[] }) {
+  const { dictionary } = useLocale();
   const width = Math.max(720, forest.length * TREE_SLOT_WIDTH + 60);
   const [selectedTreeId, setSelectedTreeId] = useState<string | null>(null);
 
@@ -55,7 +57,7 @@ export function ForestScene({ forest }: { forest: ForestTreeData[] }) {
       <svg
         viewBox={`0 0 ${width} ${SCENE_HEIGHT}`}
         role="img"
-        aria-label="成長森林全景"
+        aria-label={dictionary.forest.sceneAria}
         className="block h-auto w-full"
         style={{ minWidth: width }}
         preserveAspectRatio="xMidYMax meet"
@@ -162,6 +164,7 @@ function TreeFigure({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const { dictionary } = useLocale();
   const branchCount = tree.branches.length;
   const trunkHeight = Math.min(125 + branchCount * 22, 235);
   const trunkTopY = GROUND_Y - trunkHeight;
@@ -178,7 +181,9 @@ function TreeFigure({
       }}
       role="button"
       tabIndex={0}
-      aria-label={`${tree.title}${selected ? "（點擊隱藏名稱）" : "（點擊顯示名稱）"}`}
+      aria-label={`${tree.title}${
+        selected ? dictionary.forest.hideName : dictionary.forest.showName
+      }`}
       className="cursor-pointer focus:outline-none"
     >
       {/* 點擊判定範圍：涵蓋整棵樹的透明區域 */}
@@ -296,6 +301,7 @@ function BranchFigure({
   total: number;
   trunkHeight: number;
 }) {
+  const { dictionary, t } = useLocale();
   // 每根樹枝用自己的 id 當亂數種子；共用序列會因 React 重複渲染
   // 造成伺服器與瀏覽器畫面不一致（hydration mismatch）。
   const random = createRandom(hashSeed(branch.id));
@@ -316,7 +322,11 @@ function BranchFigure({
   return (
     <g>
       <title>
-        {`${branch.title}：${leafTotal} 片葉子、${fruits.length} 顆果實`}
+        {t(dictionary.forest.branchTitle, {
+          title: branch.title,
+          leaves: leafTotal,
+          fruits: fruits.length,
+        })}
       </title>
       <path
         d={`M ${start[0]} ${start[1]} Q ${control[0]} ${control[1]} ${end[0]} ${end[1]}`}
@@ -391,13 +401,16 @@ function CanopyLeaves({
   leafCount: number;
   topY: number;
 }) {
+  const { dictionary, t } = useLocale();
   const random = createRandom(hashSeed(`canopy-${treeId}`));
   const drawn = Math.min(leafCount, MAX_TRUNK_LEAVES);
 
   return (
     <g>
       {leafCount > 0 && (
-        <title>{`連結整棵樹的記錄：${leafCount} 片葉子`}</title>
+        <title>
+          {t(dictionary.forest.trunkLeaves, { count: leafCount })}
+        </title>
       )}
       {Array.from({ length: drawn }, (_, i) => {
         const angle = (i / Math.max(drawn, 1)) * Math.PI * 2 + random();

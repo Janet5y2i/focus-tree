@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useLocale } from "@/i18n/locale-context";
 
 interface LogoutButtonProps {
   className?: string;
@@ -9,6 +10,7 @@ interface LogoutButtonProps {
 
 export function LogoutButton({ className = "" }: LogoutButtonProps) {
   const router = useRouter();
+  const { dictionary } = useLocale();
   const [loading, setLoading] = useState(false);
 
   async function handleLogout() {
@@ -29,7 +31,7 @@ export function LogoutButton({ className = "" }: LogoutButtonProps) {
       disabled={loading}
       className={`btn-ghost ${className}`}
     >
-      {loading ? "登出中…" : "登出"}
+      {loading ? dictionary.auth.loggingOut : dictionary.auth.logout}
     </button>
   );
 }
