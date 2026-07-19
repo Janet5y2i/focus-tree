@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { LocaleProvider } from "@/i18n/locale-context";
+import { getRequestLocale } from "@/i18n/locale-server";
+import { getDictionary } from "@/i18n/get-dictionary";
+import { localeHtmlLang } from "@/i18n/config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -12,23 +16,32 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Focus Tree — 專注成長，而非待辦",
-  description:
-    "記錄你已完成的微小實踐，在目標樹上長出綠葉與果實。無焦慮的心靈成長 App。",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getRequestLocale();
+  const dictionary = getDictionary(locale);
+  return {
+    title: dictionary.meta.title,
+    description: dictionary.meta.description,
+  };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getRequestLocale();
+
   return (
     <html
-      lang="zh-TW"
+      lang={localeHtmlLang(locale)}
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <LocaleProvider key={locale} initialLocale={locale}>
+          {children}
+        </LocaleProvider>
+      </body>
     </html>
   );
 }

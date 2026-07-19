@@ -1,6 +1,8 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { localizeApiError } from "@/i18n/api-errors";
+import { useLocale } from "@/i18n/locale-context";
 import type { TreeDTO, NodeDTO } from "@/lib/types/tree";
 
 interface TreeDetailProps {
@@ -16,6 +18,7 @@ export function TreeDetail({
   onTreeDeleted,
   onStructureChanged,
 }: TreeDetailProps) {
+  const { locale, dictionary, t } = useLocale();
   const [nodes, setNodes] = useState<NodeDTO[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,14 +27,20 @@ export function TreeDetail({
       const response = await fetch(`/api/trees/${tree.id}`);
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error ?? "無法載入這棵樹");
+        setError(
+          localizeApiError(
+            data.error,
+            locale,
+            dictionary.treeDetail.loadFailed,
+          ),
+        );
         return;
       }
       setNodes(data.nodes);
     } catch {
-      setError("網路連線失敗，請稍後再試");
+      setError(dictionary.common.networkError);
     }
-  }, [tree.id]);
+  }, [tree.id, locale, dictionary]);
 
   useEffect(() => {
     let active = true;
@@ -41,22 +50,32 @@ export function TreeDetail({
         const data = await response.json();
         if (!active) return;
         if (!response.ok) {
-          setError(data.error ?? "無法載入這棵樹");
+          setError(
+            localizeApiError(
+              data.error,
+              locale,
+              dictionary.treeDetail.loadFailed,
+            ),
+          );
           return;
         }
         setNodes(data.nodes);
       })
       .catch(() => {
-        if (active) setError("網路連線失敗，請稍後再試");
+        if (active) setError(dictionary.common.networkError);
       });
 
     return () => {
       active = false;
     };
-  }, [tree.id]);
+  }, [tree.id, locale, dictionary]);
 
   async function handleDeleteTree() {
-    if (!window.confirm(`確定要移除「${tree.title}」嗎？底下的枝與任務都會一併移除。`)) {
+    if (
+      !window.confirm(
+        t(dictionary.treeDetail.deleteTreeConfirm, { title: tree.title }),
+      )
+    ) {
       return;
     }
     const response = await fetch(`/api/trees/${tree.id}`, {
@@ -78,7 +97,7 @@ export function TreeDetail({
   if (!nodes) {
     return (
       <p className="border-t border-forest-100/80 px-6 py-4 text-sm text-forest-600">
-        樹葉沙沙作響中…
+        {dictionary.treeDetail.loading}
       </p>
     );
   }
@@ -96,7 +115,7 @@ export function TreeDetail({
     <div className="flex flex-col gap-4 border-t border-forest-100/80 p-5 sm:p-6">
       {branches.length === 0 && (
         <p className="text-sm text-forest-600">
-          這棵樹還沒有樹枝。長出第一根，代表一個往目標靠近的子方向。
+          {dictionary.treeDetail.noBranches}
         </p>
       )}
 
@@ -119,8 +138,8 @@ export function TreeDetail({
 
       <AddNodeForm
         treeId={tree.id}
-        placeholder="新的子方向，例如：規律運動"
-        buttonLabel="長出樹枝"
+        placeholder={dictionary.treeDetail.branchPlaceholder}
+        buttonLabel={dictionary.treeDetail.addBranch}
         onAdded={() => {
           loadNodes();
           onStructureChanged?.();
@@ -132,7 +151,7 @@ export function TreeDetail({
         onClick={handleDeleteTree}
         className="self-end text-xs text-forest-600/60 underline-offset-4 transition-colors hover:text-rose-600 hover:underline"
       >
-        移除這棵樹
+        {dictionary.treeDetail.deleteTree}
       </button>
     </div>
   );
@@ -149,10 +168,16 @@ function BranchSection({
   tasks: NodeDTO[];
   onChanged: (tree?: TreeDTO) => void;
 }) {
+  const { dictionary, t } = useLocale();
   async function handleDeleteBranch() {
     if (
       tasks.length > 0 &&
-      !window.confirm(`移除「${branch.title}」會一併移除底下 ${tasks.length} 個任務，確定嗎？`)
+      !window.confirm(
+        t(dictionary.treeDetail.deleteBranchConfirm, {
+          title: branch.title,
+          count: tasks.length,
+        }),
+      )
     ) {
       return;
     }
@@ -170,10 +195,12 @@ function BranchSection({
         <button
           type="button"
           onClick={handleDeleteBranch}
-          aria-label={`移除樹枝 ${branch.title}`}
+          aria-label={t(dictionary.treeDetail.removeBranchAria, {
+            title: branch.title,
+          })}
           className="text-xs text-forest-600/50 transition-colors hover:text-rose-600"
         >
-          移除
+          {dictionary.common.remove}
         </button>
       </div>
 
@@ -192,8 +219,8 @@ function BranchSection({
         <AddNodeForm
           treeId={treeId}
           parentId={branch.id}
-          placeholder="小小的一步，例如：每天散步 10 分鐘"
-          buttonLabel="加上任務"
+          placeholder={dictionary.treeDetail.taskPlaceholder}
+          buttonLabel={dictionary.treeDetail.addTask}
           compact
           onAdded={() => onChanged()}
         />
@@ -211,6 +238,7 @@ function TaskRow({
   task: NodeDTO;
   onChanged: (tree?: TreeDTO) => void;
 }) {
+  const { dictionary, t } = useLocale();
   const [pending, setPending] = useState(false);
 
   async function toggleComplete() {
@@ -271,7 +299,10 @@ function TaskRow({
           {task.title}
         </span>
         {task.isCompleted && (
-          <span aria-label="已結果實" title="這個任務目前已完成">
+          <span
+            aria-label={dictionary.treeDetail.fruitAria}
+            title={dictionary.treeDetail.fruitTitle}
+          >
             🍎
           </span>
         )}
@@ -285,10 +316,12 @@ function TaskRow({
         <button
           type="button"
           onClick={handleDelete}
-          aria-label={`移除任務 ${task.title}`}
+          aria-label={t(dictionary.treeDetail.removeTaskAria, {
+            title: task.title,
+          })}
           className="text-xs text-forest-600/50 transition-colors hover:text-rose-600"
         >
-          移除
+          {dictionary.common.remove}
         </button>
       </div>
     </li>
@@ -304,9 +337,10 @@ function RecurringSwitch({
   disabled?: boolean;
   onChange: () => void;
 }) {
+  const { dictionary } = useLocale();
   return (
     <label className="flex cursor-pointer items-center gap-2 text-xs text-forest-700">
-      <span>經常性</span>
+      <span>{dictionary.treeDetail.recurring}</span>
       <input
         type="checkbox"
         role="switch"
@@ -346,6 +380,7 @@ function AddNodeForm({
   compact?: boolean;
   onAdded: () => void;
 }) {
+  const { locale, dictionary } = useLocale();
   const [title, setTitle] = useState("");
   const [isRecurring, setIsRecurring] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -365,7 +400,13 @@ function AddNodeForm({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error ?? "新增失敗，請稍後再試");
+        setError(
+          localizeApiError(
+            data.error,
+            locale,
+            dictionary.treeDetail.addFailed,
+          ),
+        );
         return;
       }
 
@@ -373,7 +414,7 @@ function AddNodeForm({
       setIsRecurring(false);
       onAdded();
     } catch {
-      setError("網路連線失敗，請稍後再試");
+      setError(dictionary.common.networkError);
     } finally {
       setLoading(false);
     }
@@ -402,7 +443,7 @@ function AddNodeForm({
           disabled={loading}
           className="btn-ghost shrink-0 whitespace-nowrap"
         >
-          {loading ? "…" : buttonLabel}
+          {loading ? dictionary.common.loadingEllipsis : buttonLabel}
         </button>
       </div>
       {error && (

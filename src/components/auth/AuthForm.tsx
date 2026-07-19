@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { localizeApiError } from "@/i18n/api-errors";
+import { useLocale } from "@/i18n/locale-context";
 
 type AuthMode = "login" | "register";
 
@@ -12,6 +14,7 @@ interface AuthFormProps {
 
 export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
+  const { locale, dictionary } = useLocale();
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [password, setPassword] = useState("");
@@ -40,14 +43,20 @@ export function AuthForm({ mode }: AuthFormProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error ?? "發生錯誤，請稍後再試");
+        setError(
+          localizeApiError(
+            data.error,
+            locale,
+            dictionary.common.somethingWrong,
+          ),
+        );
         return;
       }
 
       router.push("/");
       router.refresh();
     } catch {
-      setError("網路連線失敗，請稍後再試");
+      setError(dictionary.common.networkError);
     } finally {
       setLoading(false);
     }
@@ -57,7 +66,9 @@ export function AuthForm({ mode }: AuthFormProps) {
     <form onSubmit={handleSubmit} className="flex w-full flex-col gap-5">
       {isRegister && (
         <label className="flex flex-col gap-2">
-          <span className="text-sm font-medium text-forest-800">顯示名稱</span>
+          <span className="text-sm font-medium text-forest-800">
+            {dictionary.auth.displayName}
+          </span>
           <input
             type="text"
             value={displayName}
@@ -66,13 +77,15 @@ export function AuthForm({ mode }: AuthFormProps) {
             required
             maxLength={50}
             className="input-field"
-            placeholder="你希望被怎麼稱呼？"
+            placeholder={dictionary.auth.displayNamePlaceholder}
           />
         </label>
       )}
 
       <label className="flex flex-col gap-2">
-        <span className="text-sm font-medium text-forest-800">Email</span>
+        <span className="text-sm font-medium text-forest-800">
+          {dictionary.auth.email}
+        </span>
         <input
           type="email"
           value={email}
@@ -85,7 +98,9 @@ export function AuthForm({ mode }: AuthFormProps) {
       </label>
 
       <label className="flex flex-col gap-2">
-        <span className="text-sm font-medium text-forest-800">密碼</span>
+        <span className="text-sm font-medium text-forest-800">
+          {dictionary.auth.password}
+        </span>
         <input
           type="password"
           value={password}
@@ -94,27 +109,38 @@ export function AuthForm({ mode }: AuthFormProps) {
           required
           minLength={isRegister ? 8 : 1}
           className="input-field"
-          placeholder={isRegister ? "至少 8 字，含英文與數字" : "你的密碼"}
+          placeholder={
+            isRegister
+              ? dictionary.auth.passwordPlaceholderRegister
+              : dictionary.auth.passwordPlaceholderLogin
+          }
         />
       </label>
 
       {error && (
-        <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">
+        <p
+          className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-700"
+          role="alert"
+        >
           {error}
         </p>
       )}
 
       <button type="submit" disabled={loading} className="btn-primary">
-        {loading ? "處理中…" : isRegister ? "建立帳號" : "登入"}
+        {loading
+          ? dictionary.auth.submitting
+          : isRegister
+            ? dictionary.auth.createAccount
+            : dictionary.auth.login}
       </button>
 
       <p className="text-center text-sm text-forest-600">
-        {isRegister ? "已有帳號？" : "還沒有帳號？"}{" "}
+        {isRegister ? dictionary.auth.hasAccount : dictionary.auth.noAccount}{" "}
         <Link
           href={isRegister ? "/login" : "/register"}
           className="font-medium text-leaf-700 underline-offset-4 hover:underline"
         >
-          {isRegister ? "登入" : "註冊"}
+          {isRegister ? dictionary.auth.login : dictionary.auth.register}
         </Link>
       </p>
     </form>

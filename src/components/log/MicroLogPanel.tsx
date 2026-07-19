@@ -1,6 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { localizeApiError } from "@/i18n/api-errors";
+import type { Dictionary } from "@/i18n/dictionaries/zh-TW";
+import { useLocale } from "@/i18n/locale-context";
 import type { MicroLogDTO, MicroLogMood } from "@/lib/types/micro-log";
 import type { NodeDTO, TreeDTO } from "@/lib/types/tree";
 
@@ -10,19 +13,21 @@ interface MicroLogPanelProps {
   initialRecurringTasks: NodeDTO[];
 }
 
-const MOOD_OPTIONS: {
+function getMoodOptions(dictionary: Dictionary): {
   value: MicroLogMood;
   emoji: string;
   label: string;
-}[] = [
-  { value: "neutral", emoji: "🌿", label: "平常" },
-  { value: "calm", emoji: "😌", label: "平靜" },
-  { value: "grateful", emoji: "🙏", label: "感謝" },
-  { value: "focused", emoji: "🎯", label: "專注" },
-  { value: "joyful", emoji: "😊", label: "開心" },
-  { value: "tired", emoji: "😮‍💨", label: "疲憊" },
-  { value: "anxious", emoji: "🌧️", label: "焦慮" },
-];
+}[] {
+  return [
+    { value: "neutral", emoji: "🌿", label: dictionary.log.moodNeutral },
+    { value: "calm", emoji: "😌", label: dictionary.log.moodCalm },
+    { value: "grateful", emoji: "🙏", label: dictionary.log.moodGrateful },
+    { value: "focused", emoji: "🎯", label: dictionary.log.moodFocused },
+    { value: "joyful", emoji: "😊", label: dictionary.log.moodJoyful },
+    { value: "tired", emoji: "😮‍💨", label: dictionary.log.moodTired },
+    { value: "anxious", emoji: "🌧️", label: dictionary.log.moodAnxious },
+  ];
+}
 
 interface LogFilters {
   mood: "" | MicroLogMood;
@@ -45,6 +50,8 @@ export function MicroLogPanel({
   initialLogs,
   initialRecurringTasks,
 }: MicroLogPanelProps) {
+  const { locale, dictionary, t } = useLocale();
+  const moodOptions = getMoodOptions(dictionary);
   const [content, setContent] = useState("");
   const [recurringTaskId, setRecurringTaskId] = useState("");
   const [mood, setMood] = useState<MicroLogMood>("neutral");
@@ -70,12 +77,18 @@ export function MicroLogPanel({
       const response = await fetch(`/api/trees/${treeId}`);
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error ?? "無法載入這棵樹的細節");
+        setError(
+          localizeApiError(
+            data.error,
+            locale,
+            dictionary.log.loadTreeFailed,
+          ),
+        );
         return;
       }
       setNodesByTree((current) => ({ ...current, [treeId]: data.nodes }));
     } catch {
-      setError("網路連線失敗，無法載入目標細節");
+      setError(dictionary.log.loadTreeNetwork);
     } finally {
       setLoadingTreeIds((current) => current.filter((id) => id !== treeId));
     }
@@ -132,12 +145,14 @@ export function MicroLogPanel({
       const response = await fetch(`/api/micro-logs${query}`);
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error ?? "無法篩選記錄");
+        setError(
+          localizeApiError(data.error, locale, dictionary.log.filterFailed),
+        );
         return;
       }
       setLogs(data.logs);
     } catch {
-      setError("網路連線失敗，無法篩選記錄");
+      setError(dictionary.log.filterNetwork);
     } finally {
       setFiltering(false);
     }
@@ -171,7 +186,9 @@ export function MicroLogPanel({
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error ?? "儲存失敗，請稍後再試");
+        setError(
+          localizeApiError(data.error, locale, dictionary.log.saveFailed),
+        );
         return;
       }
 
@@ -190,7 +207,7 @@ export function MicroLogPanel({
       setSaved(true);
       await fetchFilteredLogs(filters);
     } catch {
-      setError("網路連線失敗，請稍後再試");
+      setError(dictionary.common.networkError);
     } finally {
       setLoading(false);
     }
@@ -200,26 +217,28 @@ export function MicroLogPanel({
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(18rem,0.85fr)]">
       <div className="flex flex-col gap-6">
         <section className="card-surface p-6 sm:p-8">
-          <p className="text-sm font-medium text-leaf-700">回到當下</p>
+          <p className="text-sm font-medium text-leaf-700">
+            {dictionary.log.eyebrow}
+          </p>
           <h1 className="mt-2 text-2xl font-semibold text-forest-900 sm:text-3xl">
-            剛剛完成了什麼？
+            {dictionary.log.title}
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-forest-600">
-            再微小都值得記下。喝一杯水、深呼吸一次，也都是你照顧自己的證明。
+            {dictionary.log.subtitle}
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
             {initialRecurringTasks.length > 0 && (
               <label className="flex flex-col gap-2">
                 <span className="text-sm font-medium text-forest-800">
-                  🔁 快速選擇經常性任務
+                  {dictionary.log.recurringLabel}
                 </span>
                 <select
                   value={recurringTaskId}
                   onChange={(event) => selectRecurringTask(event.target.value)}
                   className="input-field"
                 >
-                  <option value="">選擇後自動帶入記錄內容</option>
+                  <option value="">{dictionary.log.recurringPlaceholder}</option>
                   {initialRecurringTasks.map((task) => {
                     const tree = trees.find((item) => item.id === task.treeId);
                     return (
@@ -234,7 +253,7 @@ export function MicroLogPanel({
             )}
 
             <label className="flex flex-col gap-2">
-              <span className="sr-only">剛剛完成的事</span>
+              <span className="sr-only">{dictionary.log.contentAria}</span>
               <textarea
                 value={content}
                 onChange={(event) => {
@@ -246,7 +265,7 @@ export function MicroLogPanel({
                 autoFocus
                 required
                 className="input-field resize-none text-base leading-relaxed"
-                placeholder="例如：我剛剛起身伸展了一下"
+                placeholder={dictionary.log.contentPlaceholder}
               />
               <span className="self-end text-xs text-forest-600/60">
                 {content.length}/300
@@ -255,13 +274,13 @@ export function MicroLogPanel({
 
             <fieldset>
               <legend className="text-sm font-medium text-forest-800">
-                此刻的心情是什麼？
+                {dictionary.log.moodLegend}
               </legend>
               <p className="mt-1 text-xs text-forest-600">
-                沒有好壞，只是溫柔地看見現在的自己。
+                {dictionary.log.moodHint}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {MOOD_OPTIONS.map((option) => {
+                {moodOptions.map((option) => {
                   const selected = mood === option.value;
                   return (
                     <label
@@ -291,10 +310,10 @@ export function MicroLogPanel({
             {trees.length > 0 && (
               <fieldset>
                 <legend className="text-sm font-medium text-forest-800">
-                  這和哪些目標樹有一點關係？
+                  {dictionary.log.treeLegend}
                 </legend>
                 <p className="mt-1 text-xs text-forest-600">
-                  自由勾選，也可以不連結任何樹。
+                  {dictionary.log.treeHint}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {trees.map((tree) => {
@@ -355,7 +374,7 @@ export function MicroLogPanel({
                 className="rounded-xl bg-forest-50 px-4 py-3 text-sm text-leaf-700"
                 role="status"
               >
-                記下來了。這一步已經真實發生。🍃
+                {dictionary.log.saveSuccess}
               </p>
             )}
 
@@ -365,17 +384,21 @@ export function MicroLogPanel({
               className="btn-primary"
             >
               {loading
-                ? "記錄中…"
+                ? dictionary.log.saving
                 : selectedTreeIds.length > 0
-                  ? `記下來，長出 ${selectedTreeIds.length} 片葉子`
-                  : "記下這一刻"}
+                  ? t(dictionary.log.saveWithLeaves, {
+                      count: selectedTreeIds.length,
+                    })
+                  : dictionary.log.savePlain}
             </button>
           </form>
         </section>
 
         {trees.length > 0 && (
           <section className="card-surface p-6">
-            <h2 className="font-medium text-forest-900">正在長大的樹</h2>
+            <h2 className="font-medium text-forest-900">
+              {dictionary.log.growingTrees}
+            </h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               {trees.map((tree) => (
                 <div
@@ -387,7 +410,7 @@ export function MicroLogPanel({
                   </span>
                   <span
                     className="ml-3 shrink-0 text-sm text-leaf-700"
-                    title="累積的微小實踐"
+                    title={dictionary.log.leafTitle}
                   >
                     🍃 {tree.stats.leafCount}
                   </span>
@@ -447,10 +470,11 @@ function TreeNodePicker({
   selectedNodeIds: string[];
   onToggleNode: (nodeId: string) => void;
 }) {
+  const { dictionary, t } = useLocale();
   if (loading) {
     return (
       <div className="rounded-xl bg-forest-50/70 px-4 py-3 text-sm text-forest-600">
-        正在展開「{tree.title}」的樹枝…
+        {t(dictionary.log.expandingTree, { title: tree.title })}
       </div>
     );
   }
@@ -458,7 +482,7 @@ function TreeNodePicker({
   if (!nodes || nodes.length === 0) {
     return (
       <div className="rounded-xl bg-forest-50/70 px-4 py-3 text-sm text-forest-600">
-        「{tree.title}」目前沒有子目標，這筆記錄會連結到整棵樹。
+        {t(dictionary.log.treeNoNodes, { title: tree.title })}
       </div>
     );
   }
@@ -471,7 +495,7 @@ function TreeNodePicker({
         🌳 {tree.title}
       </p>
       <p className="mt-1 text-xs text-forest-600">
-        可再勾選更明確的子目標或任務（選填）。
+        {dictionary.log.pickNodesHint}
       </p>
 
       <div className="mt-3 flex flex-col gap-3">
@@ -517,6 +541,7 @@ function NodeCheckbox({
   selected: boolean;
   onToggle: (nodeId: string) => void;
 }) {
+  const { dictionary } = useLocale();
   return (
     <label className="flex cursor-pointer items-center gap-2 text-sm text-forest-800">
       <input
@@ -527,7 +552,9 @@ function NodeCheckbox({
       />
       <span aria-hidden>{node.level === 2 ? "🌿" : "↳"}</span>
       <span>{node.title}</span>
-      {node.fruitEarned && <span title="這個任務已結過果實">🍎</span>}
+      {node.fruitEarned && (
+        <span title={dictionary.log.fruitEarnedTitle}>🍎</span>
+      )}
     </label>
   );
 }
@@ -561,11 +588,14 @@ function LogHistory({
   onApply: () => void;
   onClear: () => void;
 }) {
+  const { dictionary } = useLocale();
   return (
     <aside className="card-surface h-fit p-6 lg:sticky lg:top-24">
-      <h2 className="text-lg font-medium text-forest-900">已經走過的腳步</h2>
+      <h2 className="text-lg font-medium text-forest-900">
+        {dictionary.log.historyTitle}
+      </h2>
       <p className="mt-1 text-xs text-forest-600">
-        這裡只收藏你完成的事，不計算還沒做的事。
+        {dictionary.log.historyHint}
       </p>
 
       <LogFiltersPanel
@@ -581,7 +611,7 @@ function LogHistory({
 
       {logs.length === 0 ? (
         <p className="mt-6 rounded-xl bg-forest-50/70 px-4 py-5 text-sm leading-relaxed text-forest-600">
-          第一筆記錄正在等你。不需要是大事，只要是真實發生的一小步。
+          {dictionary.log.emptyHistory}
         </p>
       ) : (
         <ol className="mt-5 flex max-h-[36rem] flex-col gap-3 overflow-y-auto pr-1">
@@ -617,6 +647,8 @@ function LogCard({
   onLoadTreeNodes: (treeId: string) => Promise<void>;
   onUpdated: (log: MicroLogDTO, trees: TreeDTO[]) => void;
 }) {
+  const { locale, dictionary } = useLocale();
+  const moodOptions = getMoodOptions(dictionary);
   const [editing, setEditing] = useState(false);
   const [content, setContent] = useState(log.content);
   const [mood, setMood] = useState<MicroLogMood>(log.mood);
@@ -688,14 +720,16 @@ function LogCard({
       });
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error ?? "更新失敗，請稍後再試");
+        setError(
+          localizeApiError(data.error, locale, dictionary.log.updateFailed),
+        );
         return;
       }
 
       onUpdated(data.log, data.trees ?? []);
       setEditing(false);
     } catch {
-      setError("網路連線失敗，請稍後再試");
+      setError(dictionary.common.networkError);
     } finally {
       setSaving(false);
     }
@@ -706,7 +740,9 @@ function LogCard({
       <li className="rounded-xl border border-leaf-600/40 bg-white p-4">
         <form onSubmit={handleSave} className="flex flex-col gap-4">
           <label className="flex flex-col gap-2">
-            <span className="text-xs font-medium text-forest-800">內容</span>
+            <span className="text-xs font-medium text-forest-800">
+              {dictionary.log.editContent}
+            </span>
             <textarea
               value={content}
               onChange={(event) => setContent(event.target.value)}
@@ -721,9 +757,11 @@ function LogCard({
           </label>
 
           <fieldset>
-            <legend className="text-xs font-medium text-forest-800">心情</legend>
+            <legend className="text-xs font-medium text-forest-800">
+              {dictionary.log.editMood}
+            </legend>
             <div className="mt-2 flex flex-wrap gap-1.5">
-              {MOOD_OPTIONS.map((option) => {
+              {moodOptions.map((option) => {
                 const selected = mood === option.value;
                 return (
                   <label
@@ -753,7 +791,7 @@ function LogCard({
           {trees.length > 0 && (
             <fieldset>
               <legend className="text-xs font-medium text-forest-800">
-                相關的目標與任務
+                {dictionary.log.editLinks}
               </legend>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {trees.map((tree) => {
@@ -812,14 +850,14 @@ function LogCard({
               disabled={saving}
               className="btn-ghost px-3 py-1.5 text-xs"
             >
-              取消
+              {dictionary.common.cancel}
             </button>
             <button
               type="submit"
               disabled={saving || !content.trim()}
               className="rounded-lg bg-leaf-700 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-leaf-600 disabled:opacity-60"
             >
-              {saving ? "儲存中…" : "儲存"}
+              {saving ? dictionary.common.saving : dictionary.common.save}
             </button>
           </div>
         </form>
@@ -836,7 +874,7 @@ function LogCard({
           onClick={startEditing}
           className="shrink-0 text-xs text-forest-600/70 underline-offset-4 transition-colors hover:text-leaf-700 hover:underline"
         >
-          編輯
+          {dictionary.common.edit}
         </button>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -849,7 +887,7 @@ function LogCard({
             key={treeId}
             className="rounded-full bg-forest-50 px-2 py-1 text-xs text-leaf-700"
           >
-            🍃 {treeNames.get(treeId) ?? "一棵成長樹"}
+            🍃 {treeNames.get(treeId) ?? dictionary.log.unnamedTree}
           </span>
         ))}
         {log.nodeLinks.map((link) => (
@@ -884,6 +922,8 @@ function LogFiltersPanel({
   onApply: () => void;
   onClear: () => void;
 }) {
+  const { dictionary } = useLocale();
+  const moodOptions = getMoodOptions(dictionary);
   const hasFilters = Object.values(filters).some(Boolean);
 
   return (
@@ -895,7 +935,9 @@ function LogFiltersPanel({
       }}
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-medium text-forest-800">篩選記錄</h3>
+        <h3 className="text-sm font-medium text-forest-800">
+          {dictionary.log.filterTitle}
+        </h3>
         {hasFilters && (
           <button
             type="button"
@@ -903,14 +945,16 @@ function LogFiltersPanel({
             disabled={filtering}
             className="text-xs text-forest-600 underline-offset-4 hover:underline"
           >
-            清除
+            {dictionary.log.clearFilters}
           </button>
         )}
       </div>
 
       <div className="mt-3 grid gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-forest-600">心情</span>
+          <span className="text-xs text-forest-600">
+            {dictionary.log.filterMood}
+          </span>
           <select
             value={filters.mood}
             onChange={(event) =>
@@ -921,8 +965,8 @@ function LogFiltersPanel({
             }
             className="input-field py-2 text-sm"
           >
-            <option value="">全部心情</option>
-            {MOOD_OPTIONS.map((option) => (
+            <option value="">{dictionary.log.allMoods}</option>
+            {moodOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.emoji} {option.label}
               </option>
@@ -931,13 +975,15 @@ function LogFiltersPanel({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-forest-600">主目標</span>
+          <span className="text-xs text-forest-600">
+            {dictionary.log.filterTree}
+          </span>
           <select
             value={filters.treeId}
             onChange={(event) => onTreeChange(event.target.value)}
             className="input-field py-2 text-sm"
           >
-            <option value="">全部目標樹</option>
+            <option value="">{dictionary.log.allTrees}</option>
             {trees.map((tree) => (
               <option key={tree.id} value={tree.id}>
                 {tree.title}
@@ -947,7 +993,9 @@ function LogFiltersPanel({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-xs text-forest-600">子目標／任務</span>
+          <span className="text-xs text-forest-600">
+            {dictionary.log.filterNode}
+          </span>
           <select
             value={filters.nodeId}
             disabled={!filters.treeId}
@@ -956,7 +1004,7 @@ function LogFiltersPanel({
             }
             className="input-field py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <option value="">全部子目標與任務</option>
+            <option value="">{dictionary.log.allNodes}</option>
             {nodes.map((node) => (
               <option key={node.id} value={node.id}>
                 {node.level === 2 ? "🌿 " : "　↳ "}
@@ -968,7 +1016,9 @@ function LogFiltersPanel({
 
         <div className="grid grid-cols-2 gap-2">
           <label className="flex min-w-0 flex-col gap-1">
-            <span className="text-xs text-forest-600">開始日期</span>
+            <span className="text-xs text-forest-600">
+              {dictionary.log.dateFrom}
+            </span>
             <input
               type="date"
               value={filters.from}
@@ -980,7 +1030,9 @@ function LogFiltersPanel({
             />
           </label>
           <label className="flex min-w-0 flex-col gap-1">
-            <span className="text-xs text-forest-600">結束日期</span>
+            <span className="text-xs text-forest-600">
+              {dictionary.log.dateTo}
+            </span>
             <input
               type="date"
               value={filters.to}
@@ -999,20 +1051,22 @@ function LogFiltersPanel({
         disabled={filtering}
         className="mt-3 w-full rounded-lg bg-leaf-700 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-leaf-600 disabled:opacity-60"
       >
-        {filtering ? "篩選中…" : "套用篩選"}
+        {filtering ? dictionary.log.applying : dictionary.log.applyFilters}
       </button>
     </form>
   );
 }
 
 function MoodBadge({ mood }: { mood: MicroLogMood }) {
+  const { dictionary } = useLocale();
+  const moodOptions = getMoodOptions(dictionary);
   const option =
-    MOOD_OPTIONS.find((item) => item.value === mood) ?? MOOD_OPTIONS[0];
+    moodOptions.find((item) => item.value === mood) ?? moodOptions[0];
 
   return (
     <span
       className="rounded-full bg-forest-50 px-2 py-1 text-xs text-forest-700"
-      title="記錄當下的心情"
+      title={dictionary.log.moodBadgeTitle}
     >
       {option.emoji} {option.label}
     </span>

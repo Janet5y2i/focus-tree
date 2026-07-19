@@ -1,5 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { LogoutButton } from "@/components/auth/LogoutButton";
+import { HowToGuideButton } from "@/components/shared/HowToGuideButton";
+import { LanguageSwitcher } from "@/components/shared/LanguageSwitcher";
+import { useLocale } from "@/i18n/locale-context";
 import type { SafeUser } from "@/models/User";
 
 interface AppShellProps {
@@ -7,13 +12,15 @@ interface AppShellProps {
   children: React.ReactNode;
 }
 
-const NAV_ITEMS = [
-  { href: "/", label: "我的樹" },
-  { href: "/log", label: "記錄" },
-  { href: "/review", label: "回顧" },
-];
-
 export function AppShell({ user, children }: AppShellProps) {
+  const { dictionary } = useLocale();
+
+  const navItems = [
+    { href: "/", label: dictionary.nav.trees },
+    { href: "/log", label: dictionary.nav.log },
+    { href: "/review", label: dictionary.nav.review },
+  ];
+
   return (
     <div className="flex min-h-full flex-col bg-surface-muted">
       <header className="sticky top-0 z-20 border-b border-forest-100/80 bg-surface/90 backdrop-blur-md">
@@ -28,7 +35,7 @@ export function AppShell({ user, children }: AppShellProps) {
           </Link>
 
           <nav className="hidden items-center gap-1 md:flex">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -40,6 +47,8 @@ export function AppShell({ user, children }: AppShellProps) {
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <HowToGuideButton />
+            <LanguageSwitcher />
             <span className="hidden text-sm text-forest-600 sm:inline">
               {user.displayName}
             </span>
@@ -48,7 +57,7 @@ export function AppShell({ user, children }: AppShellProps) {
         </div>
 
         <nav className="flex gap-1 overflow-x-auto border-t border-forest-100/60 px-4 py-2 md:hidden">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}

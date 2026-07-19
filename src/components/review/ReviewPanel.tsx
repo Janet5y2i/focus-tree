@@ -1,20 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { localizeApiError } from "@/i18n/api-errors";
+import { useLocale } from "@/i18n/locale-context";
 import type { ReviewPeriod, ReviewResponse } from "@/lib/types/review";
 
 interface ReviewPanelProps {
   initialReview: ReviewResponse;
 }
 
-const PERIOD_OPTIONS: { value: ReviewPeriod; label: string }[] = [
-  { value: "weekly", label: "這一週" },
-  { value: "biweekly", label: "這兩週" },
-  { value: "monthly", label: "這個月" },
-  { value: "custom", label: "自訂時間" },
-];
-
 export function ReviewPanel({ initialReview }: ReviewPanelProps) {
+  const { locale, dictionary, t } = useLocale();
+  const periodOptions: { value: ReviewPeriod; label: string }[] = [
+    { value: "weekly", label: dictionary.review.weekly },
+    { value: "biweekly", label: dictionary.review.biweekly },
+    { value: "monthly", label: dictionary.review.monthly },
+    { value: "custom", label: dictionary.review.custom },
+  ];
   const [review, setReview] = useState(initialReview);
   const [selectedPeriod, setSelectedPeriod] = useState<ReviewPeriod>(
     initialReview.period,
@@ -44,13 +46,19 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
       const response = await fetch(url);
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error ?? "無法生成回顧，請稍後再試");
+        setError(
+          localizeApiError(
+            data.error,
+            locale,
+            dictionary.review.generateFailed,
+          ),
+        );
         return;
       }
       setReview(data);
       setSelectedPeriod(data.period);
     } catch {
-      setError("網路連線失敗，請稍後再試");
+      setError(dictionary.common.networkError);
     } finally {
       setLoading(false);
     }
@@ -58,11 +66,11 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
 
   async function applyCustomRange() {
     if (!customFrom || !customTo) {
-      setError("請選擇開始與結束日期");
+      setError(dictionary.review.needDates);
       return;
     }
     if (customFrom > customTo) {
-      setError("開始日期不能晚於結束日期");
+      setError(dictionary.review.invalidRange);
       return;
     }
 
@@ -81,18 +89,20 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
       <section className="card-surface p-6 sm:p-8">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-leaf-700">成長回顧</p>
+            <p className="text-sm font-medium text-leaf-700">
+              {dictionary.review.eyebrow}
+            </p>
             <h1 className="mt-2 text-2xl font-semibold text-forest-900 sm:text-3xl">
-              你不知不覺，走了這麼遠
+              {dictionary.review.title}
             </h1>
           </div>
 
           <div
             role="tablist"
-            aria-label="回顧期間"
+            aria-label={dictionary.review.periodAria}
             className="flex flex-wrap gap-1 self-start rounded-2xl bg-forest-50 p-1"
           >
-            {PERIOD_OPTIONS.map((option) => {
+            {periodOptions.map((option) => {
               const active = option.value === selectedPeriod;
               return (
                 <button
@@ -118,7 +128,9 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
         {selectedPeriod === "custom" && (
           <div className="mt-5 flex flex-col gap-3 rounded-xl bg-forest-50/70 p-4 sm:flex-row sm:items-end">
             <label className="flex flex-1 flex-col gap-1">
-              <span className="text-xs text-forest-600">開始日期</span>
+              <span className="text-xs text-forest-600">
+                {dictionary.review.dateFrom}
+              </span>
               <input
                 type="date"
                 value={customFrom}
@@ -128,7 +140,9 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
               />
             </label>
             <label className="flex flex-1 flex-col gap-1">
-              <span className="text-xs text-forest-600">結束日期</span>
+              <span className="text-xs text-forest-600">
+                {dictionary.review.dateTo}
+              </span>
               <input
                 type="date"
                 value={customTo}
@@ -143,7 +157,9 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
               disabled={loading || !customFrom || !customTo}
               className="rounded-xl bg-leaf-700 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-leaf-600 disabled:opacity-60"
             >
-              {loading ? "回顧中…" : "看看這段成長"}
+              {loading
+                ? dictionary.review.reviewing
+                : dictionary.review.applyCustom}
             </button>
           </div>
         )}
@@ -159,10 +175,26 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard emoji="🍃" label="長出的葉子" value={stats.leafCount} />
-        <StatCard emoji="🍎" label="結出的果實" value={stats.fruitCount} />
-        <StatCard emoji="📝" label="當下的實踐" value={stats.logCount} />
-        <StatCard emoji="🌤️" label="有你的日子" value={stats.activeDays} />
+        <StatCard
+          emoji="🍃"
+          label={dictionary.review.leafStat}
+          value={stats.leafCount}
+        />
+        <StatCard
+          emoji="🍎"
+          label={dictionary.review.fruitStat}
+          value={stats.fruitCount}
+        />
+        <StatCard
+          emoji="📝"
+          label={dictionary.review.logStat}
+          value={stats.logCount}
+        />
+        <StatCard
+          emoji="🌤️"
+          label={dictionary.review.dayStat}
+          value={stats.activeDays}
+        />
       </section>
 
       <section
@@ -176,7 +208,7 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
             🌳
           </span>
           <h2 className="text-lg font-medium text-forest-900">
-            寫給你的一段話
+            {dictionary.review.letterTitle}
           </h2>
         </div>
 
@@ -188,8 +220,10 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
 
         {stats.topTree && (
           <p className="mt-6 rounded-xl bg-forest-50/70 px-4 py-3 text-sm text-forest-700">
-            這段期間你最常灌溉「{stats.topTree.title}」，為它添了{" "}
-            {stats.topTree.leaves} 片葉子。🍃
+            {t(dictionary.review.topTree, {
+              title: stats.topTree.title,
+              leaves: stats.topTree.leaves,
+            })}
           </p>
         )}
       </section>
@@ -197,7 +231,7 @@ export function ReviewPanel({ initialReview }: ReviewPanelProps) {
       {stats.highlights.length > 0 && (
         <section className="card-surface p-6 sm:p-8">
           <h2 className="text-lg font-medium text-forest-900">
-            那些你完成的瞬間
+            {dictionary.review.highlightsTitle}
           </h2>
           <ul className="mt-4 flex flex-col gap-2">
             {stats.highlights.map((highlight, index) => (

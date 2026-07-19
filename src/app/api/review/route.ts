@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { getRequestLocale } from "@/i18n/locale-server";
 import { requireSession } from "@/lib/api/guard";
 import { jsonError, jsonSuccess } from "@/lib/api/response";
 import { buildReviewStats } from "@/lib/review/aggregate";
@@ -8,6 +9,7 @@ import { User } from "@/models/User";
 
 export async function GET(request: NextRequest) {
   try {
+    const locale = await getRequestLocale();
     const session = await requireSession();
     if (!session) return jsonError("未登入", 401);
 
@@ -38,6 +40,7 @@ export async function GET(request: NextRequest) {
       user.displayName,
       period,
       stats,
+      locale,
     );
 
     return jsonSuccess({ period, stats, summary, generatedBy });

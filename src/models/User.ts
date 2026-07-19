@@ -58,7 +58,7 @@ export type SafeUser = {
   displayName: string;
   avatarUrl?: string;
   preferences: IUser["preferences"];
-  createdAt: Date;
+  createdAt: string;
 };
 
 export function toSafeUser(user: IUser): SafeUser {
@@ -67,7 +67,11 @@ export function toSafeUser(user: IUser): SafeUser {
     email: user.email,
     displayName: user.displayName,
     avatarUrl: user.avatarUrl,
-    preferences: user.preferences,
-    createdAt: user.createdAt,
+    preferences: {
+      locale: user.preferences.locale,
+      reviewCadence: user.preferences.reviewCadence,
+      timezone: user.preferences.timezone,
+    },
+    createdAt: user.createdAt.toISOString(),
   };
 }
